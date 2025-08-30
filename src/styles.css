@@ -1,0 +1,4 @@
+:host ::ng-deep app-sidebar .sidebar {
+  background: #ffffff !important;  /* ✅ white background */
+  color: #111827 !important;       /* ✅ dark text */
+}
