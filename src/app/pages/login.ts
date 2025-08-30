@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -17,7 +18,8 @@ import { HttpClient } from '@angular/common/http';
 
     <form (ngSubmit)="submit()" #f="ngForm">
       <div style="display:grid; gap:10px;margin-top:8px">
-        <input class="input" name="email" [(ngModel)]="email" type="email" placeholder="Email" required />
+        <!-- ✅ changed from email → username -->
+        <input class="input" name="username" [(ngModel)]="username" type="text" placeholder="Username" required />
         <input class="input" name="password" [(ngModel)]="password" type="password" placeholder="Password" required />
         <button class="btn" type="submit">Sign In</button>
 
@@ -36,7 +38,7 @@ import { HttpClient } from '@angular/common/http';
     <div *ngIf="error" class="error" style="margin-top:8px">{{error}}</div>
   </section>
   `,
-  styles: [`
+    styles: [`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     :host {
       font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -79,15 +81,26 @@ import { HttpClient } from '@angular/common/http';
   `]
 })
 export class LoginComponent {
-  email = '';
+  username = '';   // ✅ changed from email
   password = '';
   error = '';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private authService: AuthService) {}
+
+  // Using AuthService
+  onLogin() {
+    this.authService.login({ username: this.username, password: this.password }).subscribe((res: any) => {
+      if (res?.token) {
+        this.authService.setToken(res.token); // store token in cookie
+      }
+    });
+  }
+
+  // Direct API call
   submit() {
     this.error = '';
     this.http.post('http://localhost:8080/api/auth/login', {
-      email: this.email,
+      username: this.username,   // ✅ changed
       password: this.password
     }).subscribe({
       next: (res: any) => {

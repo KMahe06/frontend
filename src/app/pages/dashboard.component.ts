@@ -1,266 +1,181 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, HostListener, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SidebarComponent } from "./sidebar.component";
 import { NgChartsModule } from 'ng2-charts';
-import { Chart, ChartConfiguration, ChartOptions } from 'chart.js';
+import { ChartConfiguration, ChartOptions } from 'chart.js';
+import { SidebarComponent } from './sidebar.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, SidebarComponent, NgChartsModule],
+  imports: [CommonModule, NgChartsModule, SidebarComponent],
   template: `
     <div class="layout" [class.sidebar-closed]="isSidebarClosed">
+      <!-- Hamburger (only if sidebar is closed) -->
+      <button class="hamburger" *ngIf="isSidebarClosed" (click)="toggleSidebar()">
+        <span></span><span></span><span></span>
+      </button>
+
       <!-- Sidebar -->
       <app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
       <!-- Main Content -->
-      <div class="content fade-in">
-        <!-- Header -->
-        <h1 class="header">📊 Dashboard</h1>
+      <div class="content">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="quote">"Overview of your uploads and stats"</p>
 
-        <!-- Top Section: Cards -->
-        <div class="cards-row">
-          <div class="card blue hover-scale">
-            <h3>{{ totalFiles }}</h3>
-            <p>Total Files Uploaded</p>
-          </div>
-          <div class="card green hover-scale">
-            <h3>{{ categories.length }}</h3>
-            <p>Categories Used</p>
-          </div>
-          <div class="card yellow hover-scale">
-            <h3>{{ recentUploads }}</h3>
-            <p>Recent Uploads</p>
-          </div>
-        </div>
+        <div class="dashboard">
 
-        <!-- Full width Bar Graph -->
-        <div class="chart-section hover-scale">
-          <h3 class="chart-title">📂 Files by Category</h3>
-          <canvas
-            baseChart
-            [data]="barChartData"
-            [options]="barChartOptions"
-            [type]="barChartType"
-            [plugins]="barChartPlugins">
-          </canvas>
+          <!-- Row 1 -->
+          <div class="row">
+            <div class="card flex-2">
+              <h3>📈 Uploads Summary</h3>
+              <canvas baseChart [data]="lineChartData" [options]="lineChartOptions" [type]="'line'"></canvas>
+            </div>
+            <div class="card flex-1">
+              <h3>📂 Category Distribution</h3>
+              <canvas baseChart [data]="doughnutChartData" [options]="doughnutChartOptions" [type]="'doughnut'"></canvas>
+              <div class="category-grid">
+                <div class="category-item" *ngFor="let cat of categoryStats; let i=index">
+                  <span class="category-color" [style.background]="chartColors[i]"></span>
+                  <span>{{cat.label}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="row">
+            <div class="card flex-1">
+              <h3>📑 Recent Uploads</h3>
+              <table>
+                <thead>
+                  <tr><th>File</th><th>Category</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let file of recentUploads">
+                    <td>{{file.name}}</td>
+                    <td>{{file.category}}</td>
+                    <td>{{file.date}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card flex-1">
+              <h3>📊 Uploads by Category</h3>
+              <canvas baseChart [data]="barChartData" [options]="barChartOptions" [type]="'bar'"></canvas>
+            </div>
+          </div>
+
+          <!-- Row 3 -->
+          <div class="row">
+            <div class="card flex-2">
+              <h3>🔵 Circular Stats</h3>
+              <div class="circle-row">
+                <div class="circle-card" *ngFor="let cat of categoryStats">
+                  <div class="circle">{{cat.value}}</div>
+                  <p>{{cat.label}}</p>
+                </div>
+              </div>
+            </div>
+            <div class="card flex-1">
+              <h3>🔥 Most Uploaded Trend</h3>
+              <canvas baseChart [data]="miniLineChartData" [options]="miniLineChartOptions" [type]="'line'"></canvas>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
   `,
   styles: [`
-    :host {
-      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      display: block;
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
-      background: linear-gradient(135deg, #f9fafb, #eef2ff);
-    }
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; width: 100%; font-family: 'Inter', sans-serif; }
+    app-sidebar { width: 240px; flex-shrink: 0; transition: all 0.3s ease; }
+    .layout.sidebar-closed app-sidebar { display: none; }
+    .content { flex: 1; padding: 30px; background: #eeeff2ff; transition: all 0.3s ease; }
+    .page-title { text-align: center; font-size: 30px; font-weight: 700; margin-bottom: 5px; }
+    .quote { text-align: center; color: #6b7280; margin-bottom: 20px; }
 
-    .layout {
-      display: flex;
-      height: 100vh;
-      transition: all 0.3s ease-in-out;
+    /* Hamburger */
+    .hamburger {
+      position: fixed; top: 20px; left: 20px; width: 25px; height: 20px;
+      background: transparent; border: none; display: flex; flex-direction: column;
+      justify-content: space-between; cursor: pointer; z-index: 1000;
     }
+    .hamburger span { display: block; height: 4px; width: 100%; background: #000; border-radius: 2px; }
 
-    app-sidebar {
-      flex: 0 0 250px;
-      transition: all 0.3s ease-in-out;
-    }
+    /* Dashboard Cards */
+    .dashboard { }
+    .row { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+    .card { background: #1e293b; border-radius: 16px; padding: 16px;
+            flex: 1; box-shadow: 0 6px 16px rgba(0,0,0,0.4); transition: 0.3s; }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+    .flex-2 { flex: 2; } .flex-1 { flex: 1; }
+    h3 { margin-bottom: 12px; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 6px; }
 
-    .layout.sidebar-closed app-sidebar {
-      flex: 0 0 0;
-      width: 0;
-      overflow: hidden;
-    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #334155;color:white }
+    th { color: #ffffffff; font-weight: 500; }
 
-    .content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
-      transition: all 0.3s ease-in-out;
-      width: calc(100% - 250px);
-    }
+    /* Category Grid */
+    .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+    .category-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #f9fafb; }
+    .category-color { width: 16px; height: 16px; border-radius: 3px; display: inline-block; }
 
-    .layout.sidebar-closed .content {
-      width: 100%;
-    }
+    /* Circles */
+    .circle-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .circle-card { text-align: center; flex: 1 1 calc(12.5% - 12px); min-width: 80px; }
+    .circle { width: 60px; height: 60px; border-radius: 50%; background: #3b82f6; color: #fff;
+              display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin: auto; }
+    .circle-card p { margin-top: 6px; font-size: 14px; color: #cbd5e1; }
 
-    /* Header */
-    .header {
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 20px;
-      color: #111827;
-      letter-spacing: -0.5px;
+    /* Responsive */
+    @media(max-width: 1024px) {
+      .row { flex-direction: column; }
+      .category-grid { grid-template-columns: repeat(2, 1fr); }
+      .circle-card { flex: 1 1 calc(25% - 12px); }
     }
-
-    /* Fade-in animation */
-    .fade-in {
-      animation: fadeIn 0.8s ease-in;
+    @media(max-width: 768px) {
+      .content { padding: 15px; }
+      .page-title { font-size: 24px; }
+      .category-grid { grid-template-columns: 1fr; }
+      .circle-card { flex: 1 1 calc(50% - 12px); }
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Cards Row */
-    .cards-row {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-
-    .card {
-      flex: 1;
-      padding: 20px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #ffffff, #f9fafb);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-
-    .card:hover {
-      background: linear-gradient(135deg, #f3f4f6, #ffffff);
-    }
-
-    .card h3 {
-      font-size: 28px;
-      margin: 0;
-      font-weight: 700;
-      color: #111827;
-    }
-
-    .card p {
-      margin: 5px 0 0;
-      font-size: 15px;
-      color: #6b7280;
-    }
-
-    .card.blue { border-left: 6px solid #3b82f6; }
-    .card.green { border-left: 6px solid #10b981; }
-    .card.yellow { border-left: 6px solid #f59e0b; }
-
-    /* Hover Scale + Shadow */
-    .hover-scale {
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .hover-scale:hover {
-      transform: translateY(-6px) scale(1.02);
-      box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-    }
-
-    /* Chart Section */
-    .chart-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: linear-gradient(135deg, #ffffff, #f9fafb);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-      min-height: 0;
-      transition: all 0.3s ease;
-    }
-
-    .chart-title {
-      font-size: 20px;
-      margin-bottom: 15px;
-      font-weight: 600;
-      color: #1f2937;
-    }
-
-    canvas {
-      flex: 1;
-      width: 100% !important;
-      height: 100% !important;
-      min-height: 0;
-    }
-
-    /* Responsive tweaks */
-    @media (max-width: 992px) {
-      .cards-row {
-        flex-direction: column;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .header {
-        font-size: 26px;
-      }
+    @media(max-width: 480px) {
+      .circle-card { flex: 1 1 100%; }
     }
   `]
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   isSidebarClosed = false;
+  @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
 
-  totalFiles = 25;
-  recentUploads = 3;
-  categories = [
-    'aadhaar', 'pan', 'id proof', 'insurance docs',
-    'school marksheets', 'college marksheets', 'asset docs', 'other'
+  ngOnInit() { this.checkScreenSize(); }
+  @HostListener('window:resize') onResize() { this.checkScreenSize(); }
+  checkScreenSize() { this.isSidebarClosed = window.innerWidth <= 992; }
+  onSidebarToggle(state: boolean) { this.isSidebarClosed = state; }
+  toggleSidebar() { if (this.sidebar) this.sidebar.toggleSidebar(); }
+
+  // Dummy Data
+  recentUploads = [
+    { name: 'aadhaar.pdf', category: 'Aadhaar', date: '2025-08-28' },
+    { name: 'pan.png', category: 'PAN', date: '2025-08-27' },
+    { name: 'marksheet.pdf', category: 'College Marksheets', date: '2025-08-26' }
   ];
-
-  onSidebarToggle(state: boolean) {
-    this.isSidebarClosed = state;
-  }
-
-  // Chart Config
-  public barChartOptions: ChartOptions<'bar'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 14 } } },
-      y: { beginAtZero: true, ticks: { font: { size: 14 } } }
-    },
-    animation: {
-      duration: 1000,
-      easing: 'easeOutQuart'
-    }
-  };
-
-  public barChartType: 'bar' = 'bar';
-  public barChartPlugins = [{
-    id: 'gradientBar',
-    beforeDatasetsDraw: (chart: any) => {
-      const ctx = chart.ctx;
-      chart.data.datasets.forEach((dataset: any, i: number) => {
-        const meta = chart.getDatasetMeta(i);
-        meta.data.forEach((bar: any, index: number) => {
-          const gradient = ctx.createLinearGradient(0, bar.y, 0, bar.base);
-          gradient.addColorStop(0, this.gradientColors[index % this.gradientColors.length][0]);
-          gradient.addColorStop(1, this.gradientColors[index % this.gradientColors.length][1]);
-          bar.options.backgroundColor = gradient;
-        });
-      });
-    }
-  }];
-
-  gradientColors = [
-    ['#3b82f6', '#60a5fa'],
-    ['#10b981', '#34d399'],
-    ['#f59e0b', '#fbbf24'],
-    ['#ef4444', '#f87171'],
-    ['#6366f1', '#818cf8'],
-    ['#8b5cf6', '#a78bfa'],
-    ['#ec4899', '#f472b6'],
-    ['#14b8a6', '#2dd4bf']
+  categoryStats = [
+    { label: 'Aadhaar', value: 4 }, { label: 'PAN', value: 6 },
+    { label: 'ID Proof', value: 3 }, { label: 'Insurance', value: 5 },
+    { label: 'College', value: 7 }, { label: 'Asset Docs', value: 2 },
+    { label: 'Other', value: 4 }, { label: 'Residence', value: 6 }
   ];
+  public lineChartData: ChartConfiguration<'line'>['data'] = { labels: Array.from({length: 12}, (_, i) => `Day ${i+1}`), datasets: [{ data: [3,5,5,6,6,7,6,6,7,8,7,7], label: 'Uploads', fill: true, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.2)', tension: 0.3 }] };
+  public lineChartOptions: ChartOptions<'line'> = { responsive: true, plugins: { legend: { labels: { color: '#f9fafb' } } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
+  public doughnutChartData: ChartConfiguration<'doughnut'>['data'] = { labels: this.categoryStats.map(c => c.label), datasets: [{ data: this.categoryStats.map(c => c.value), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#8b5cf6','#14b8a6','#e11d48'] }] };
+  public doughnutChartOptions: ChartOptions<'doughnut'> = { responsive: true, plugins: { legend: { display: false } } };
+  public barChartData: ChartConfiguration<'bar'>['data'] = { labels: this.categoryStats.map(c => c.label), datasets: [{ label: 'Files', data: this.categoryStats.map(c => c.value), backgroundColor: '#3b82f6' }] };
+  public barChartOptions: ChartOptions<'bar'> = { responsive: true, plugins: { legend: { labels: { color: '#f9fafb' } } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
+  public miniLineChartData: ChartConfiguration<'line'>['data'] = { labels: ['Mon','Tue','Wed','Thu','Fri','Sat'], datasets: [{ data: [2,3,4,3,5,6], label: 'Top Category', borderColor: '#10b981', fill: false, tension: 0.3 }] };
+  public miniLineChartOptions: ChartOptions<'line'> = { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
 
-  public barChartData: ChartConfiguration<'bar'>['data'] = {
-    labels: this.categories,
-    datasets: [
-      {
-        label: 'Files',
-        data: [4, 6, 3, 5, 7, 8, 2, 4],
-        borderRadius: 8,
-        borderSkipped: false
-      }
-    ]
-  };
+  get chartColors(): string[] { return this.doughnutChartData.datasets[0].backgroundColor as string[]; }
 }

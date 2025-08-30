@@ -17,9 +17,10 @@ import { RouterModule } from '@angular/router';
           <li><a routerLink="/dashboard" routerLinkActive="active">Dashboard</a></li>
           <li><a routerLink="/upload" routerLinkActive="active">Upload</a></li>
           <li><a routerLink="/mywallet" routerLinkActive="active">My Wallet</a></li>
-          <li><a routerLink="/sensitivity" routerLinkActive="active">Share</a></li>
+          <!-- <li><a routerLink="/sensitivity" routerLinkActive="active">Share</a></li> -->
           <li><a routerLink="/receivedfiles" routerLinkActive="active">Received Files</a></li>
           <li><a routerLink="/sharedfiles" routerLinkActive="active">Shared Files</a></li>
+
          
           <li><a routerLink="/history" routerLinkActive="active">History</a></li>
           <li><a routerLink="/settings" routerLinkActive="active">Settings</a></li>

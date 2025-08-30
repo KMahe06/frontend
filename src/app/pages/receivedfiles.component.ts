@@ -1,27 +1,26 @@
-import { Component, OnInit, HostListener, ViewChild, ViewChildren, QueryList, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, HostListener, ViewChildren, QueryList, ElementRef, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from './sidebar.component';
-import { RouterModule } from '@angular/router';
-
+import { PaginationService,PaginatedResponse } from '../core/pagination';
+import { Router } from '@angular/router';
 interface ReceivedFile {
   id: number;
+  senderName: string;
+  receiverName: string;
   filename: string;
-  description: string;
   category: string;
-  customCategory?: string;
-  senderUsername: string;
-  timestamp: string;  // ISO string from backend
+  isSensitive: boolean;
 }
 
 @Component({
   selector: 'app-receivedfiles',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent,RouterModule],
+  imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent],
   template: `
     <div class="layout" [class.sidebar-closed]="isSidebarClosed">
-      <!-- Hamburger (only if sidebar is closed) -->
+      <!-- Hamburger -->
       <button class="hamburger" *ngIf="isSidebarClosed" (click)="toggleSidebar()">
         <span></span><span></span><span></span>
       </button>
@@ -32,30 +31,41 @@ interface ReceivedFile {
       <!-- Main Content -->
       <div class="content">
         <h1 class="page-title">Received Files</h1>
-        <p class="quote">"All files shared with you by others."</p>
+        <p class="quote">"Here are the files you have received."</p>
 
-        <!-- Search -->
-        <div class="search-bar">
-          <input type="text" [(ngModel)]="searchQuery" (input)="searchFiles()" placeholder="Search by filename, sender or description..." />
+        <!-- Search + Filters -->
+        <div class="toolbar">
+          <input type="text" [(ngModel)]="searchQuery" (input)="searchFilesWithPagination()" placeholder="Search by sender name, filename or category..." />
+
+          <div class="filters">
+            <button [class.active]="filterType === 'all'" (click)="setFilter('all')">All</button>
+            <button [class.active]="filterType === 'sensitive'" (click)="setFilter('sensitive')">Sensitive</button>
+            <button [class.active]="filterType === 'insensitive'" (click)="setFilter('insensitive')">Insensitive</button>
+          </div>
         </div>
 
         <!-- Card Grid -->
         <div class="card-grid">
           <div
             class="file-card"
-            *ngFor="let file of receivedFiles"
+            *ngFor="let file of filteredFiles"
             #cardEl
-            [class.active]="selectedCard?.id === file.id"
-            (click)="selectCard(file)"
           >
             <h3>{{ file.filename }}</h3>
-            <p class="description">{{ file.description }}</p>
-            <p class="meta">📂 Category: {{ file.category === 'other' ? file.customCategory : file.category }}</p>
-            <p class="meta">👤 From: {{ file.senderUsername }}</p>
-            <p class="meta">🕒 {{ file.timestamp | date:'medium' }}</p>
-
-            <button class="btn-download" (click)="downloadFile(file, $event)">Download</button>
+            <p><strong>Sender:</strong> {{ file.senderName }}</p>
+            <p><strong>Receiver:</strong> {{ file.receiverName }}</p>
+            <p><strong>Category:</strong> {{ file.category }}</p>
+            <p><strong>Sensitivity:</strong>
+              <span [class.sensitive]="file.isSensitive" [class.insensitive]="!file.isSensitive">
+                {{ file.isSensitive ? 'Sensitive' : 'Insensitive' }}
+              </span>
+            </p>
           </div>
+        </div>
+        <div class="pagination">
+          <button (click)="prevPage()" [disabled]="currentPage === 0">Prev</button>
+          <span>Page {{ currentPage + 1 }} of {{ totalPages }}</span>
+          <button (click)="nextPage()" [disabled]="currentPage + 1 >= totalPages">Next</button>
         </div>
       </div>
     </div>
@@ -67,6 +77,7 @@ interface ReceivedFile {
       width: 100%;
        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       transition: all 0.3s ease;
+      background: #f9fafb;
     }
     app-sidebar {
       width: 240px;
@@ -81,37 +92,60 @@ interface ReceivedFile {
       padding: 30px;
       transition: all 0.3s ease;
     }
+
     .page-title {
       text-align: center;
-      font-size: 30px;
+      font-size: 28px;
       font-weight: 700;
       margin-bottom: 5px;
     }
     .quote {
       text-align: center;
       color: #6b7280;
-      margin-bottom: 20px;
+      margin-bottom: 25px;
     }
 
-    /* Search */
-    .search-bar {
+    /* Toolbar */
+    .toolbar {
       display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
       justify-content: center;
-      margin-bottom: 30px;
+      margin-bottom: 25px;
     }
-    .search-bar input {
-      width: 100%;
-      max-width: 600px;
+    .toolbar input {
+      flex: 1;
+      min-width: 250px;
+      max-width: 400px;
       padding: 12px;
       border-radius: 10px;
       border: 1px solid #ccc;
       font-size: 15px;
-      transition: box-shadow 0.2s ease;
+      transition: all 0.3s ease;
     }
-    .search-bar input:focus {
+    .toolbar input:focus {
       outline: none;
-      border-color: #4f46e5;
-      box-shadow: 0 0 0 3px rgba(79,70,229,0.2);
+      border: 1px solid transparent;
+      background-clip: padding-box;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.5); /* purple glow */
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+    }
+    .filters button {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      background: #e5e7eb;
+      transition: background 0.2s ease;
+    }
+    .filters button.active {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
     }
 
     /* Grid */
@@ -121,99 +155,77 @@ interface ReceivedFile {
       gap: 20px;
       align-items: stretch;
     }
-
     .file-card {
       background: #fff;
       padding: 20px;
-      border-radius: 16px;
+      border-radius: 14px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      cursor: pointer;
-      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
     .file-card:hover {
-      transform: translateY(-4px) scale(1.02);
+      transform: translateY(-4px);
       box-shadow: 0 10px 25px rgba(0,0,0,0.12);
     }
     .file-card h3 {
-      margin-bottom: 10px;
       font-size: 18px;
       font-weight: 600;
+      margin-bottom: 8px;
+      color: #111827;
     }
     .file-card p {
       margin: 4px 0;
       font-size: 14px;
       color: #374151;
     }
-    .file-card .meta {
-      font-weight: 500;
-      color: #111827;
-      font-size: 13px;
-    }
-    .file-card .description {
-      color: #4b5563;
-      font-size: 14px;
-    }
 
-    /* Active Card Effect */
-    .file-card.active {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      width: 400px;
-      max-width: 95%;
-      transform: translate(-50%, -50%) scale(1.05);
-      z-index: 999;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+    .sensitive { color: #dc2626; font-weight: bold; }
+    .insensitive { color: #16a34a; font-weight: bold; }
+      .pagination {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
     }
-
-    /* Download button */
-    .btn-download {
-      margin-top: 12px;
-      padding: 10px 14px;
+    .pagination button {
+      padding: 8px 16px;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       background: #2563eb;
       color: white;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease;
+      transition: background 0.2s ease;
     }
-    .btn-download:hover {
-      background: #1e40af;
-      transform: translateY(-2px);
+    .pagination button[disabled] {
+      background: #9ca3af;
+      cursor: not-allowed;
     }
-
     /* Hamburger */
-     /* Hamburger Button */
     .hamburger {
       position: fixed;
       top: 20px;
       left: 20px;
       width: 25px;
       height: 20px;
-      background: transparent;
       border: none;
+      background: transparent;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       cursor: pointer;
-      z-index: 1000;
-      padding: 0;
+      z-index: 1100;
     }
-
     .hamburger span {
       display: block;
-      height: 4px;
       width: 100%;
+      height: 4px;
       background: #000;
       border-radius: 2px;
-      transition: background 0.3s ease;
     }
-
 
     /* Responsiveness */
     @media (max-width: 768px) {
@@ -225,19 +237,22 @@ interface ReceivedFile {
   `]
 })
 export class ReceivedFilesComponent implements OnInit, AfterViewInit {
-  receivedFiles: ReceivedFile[] = [];
-  selectedCard: ReceivedFile | null = null;
-  isSidebarClosed = false;
+  allFiles: ReceivedFile[] = [];
+  filteredFiles: ReceivedFile[] = [];
   searchQuery: string = '';
+  filterType: 'all' | 'sensitive' | 'insensitive' = 'all';
+  isSidebarClosed = false;
 
-  @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
   @ViewChildren('cardEl') cardElements!: QueryList<ElementRef>;
+  @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
 
-  constructor(private http: HttpClient) {}
+  
+  constructor(private http: HttpClient, private router: Router,private paginationService:PaginationService) {}
 
   ngOnInit() {
     this.checkScreenSize();
     this.fetchReceivedFiles();
+    this.loadPage();
   }
 
   ngAfterViewInit() {
@@ -245,8 +260,8 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
   }
 
   @HostListener('window:resize')
-  onResize() { 
-    this.checkScreenSize(); 
+  onResize() {
+    this.checkScreenSize();
     this.adjustCardHeights();
   }
 
@@ -264,11 +279,13 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
 
   fetchReceivedFiles() {
     this.http.get<ReceivedFile[]>('http://localhost:8080/api/received-files').subscribe({
-      next: (res) => { 
-        this.receivedFiles = res; 
+      next: (res) => {
+        this.allFiles = res;
+        this.applyFilters();
+        this.syncToMyWallet(res); // <-- automatically push to wallet
         setTimeout(() => this.adjustCardHeights(), 0);
       },
-      error: (err) => { console.error('Failed to fetch received files', err); }
+      error: (err) => console.error('Failed to fetch received files', err)
     });
   }
 
@@ -277,50 +294,117 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
       this.fetchReceivedFiles();
       return;
     }
+
     this.http.get<ReceivedFile[]>(`http://localhost:8080/api/received-files/search?query=${this.searchQuery}`).subscribe({
-      next: (res) => { 
-        this.receivedFiles = res; 
+      next: (res) => {
+        this.allFiles = res;
+        this.applyFilters();
+        this.syncToMyWallet(res); // <-- also sync search results to wallet
         setTimeout(() => this.adjustCardHeights(), 0);
       },
-      error: (err) => { console.error('Search failed', err); }
+      error: (err) => console.error('Search failed', err)
     });
   }
 
-  downloadFile(file: ReceivedFile, event: MouseEvent) {
-    event.stopPropagation();
-    this.http.get(`http://localhost:8080/api/received-files/download/${file.id}`, { responseType: 'blob' })
-      .subscribe({
-        next: (blob) => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = file.filename;
-          a.click();
-          window.URL.revokeObjectURL(url);
-        },
-        error: (err) => { console.error('Download failed', err); }
-      });
+  setFilter(type: 'all' | 'sensitive' | 'insensitive') {
+    this.filterType = type;
+    this.applyFilters();
   }
 
-  selectCard(file: ReceivedFile) {
-    this.selectedCard = this.selectedCard?.id === file.id ? null : file;
+  private applyFilters() {
+    let files = [...this.allFiles];
+
+    if (this.filterType === 'sensitive') {
+      files = files.filter(f => f.isSensitive);
+    } else if (this.filterType === 'insensitive') {
+      files = files.filter(f => !f.isSensitive);
+    }
+
+    this.filteredFiles = files;
   }
 
   private adjustCardHeights() {
     if (!this.cardElements || this.cardElements.length === 0) return;
-
-    this.cardElements.forEach(card => {
-      card.nativeElement.style.height = 'auto';
-    });
-
+    this.cardElements.forEach(card => card.nativeElement.style.height = 'auto');
     let maxHeight = 0;
     this.cardElements.forEach(card => {
       const height = card.nativeElement.offsetHeight;
       if (height > maxHeight) maxHeight = height;
     });
-
     this.cardElements.forEach(card => {
       card.nativeElement.style.height = maxHeight + 'px';
     });
+  }
+
+  private syncToMyWallet(files: ReceivedFile[]) {
+    this.http.post('http://localhost:8080/api/mywallet', files).subscribe({
+      next: () => console.log('Files synced to MyWallet'),
+      error: (err) => console.error('Failed to sync to MyWallet', err)
+    });
+  }
+  currentPage = 0;
+  totalPages = 0;
+  pageSize = 6;   // ✅ match backend
+  totalElements = 0;
+
+loadPage() {
+  this.paginationService.getPaginatedData<ReceivedFile>('mywallet', this.currentPage, this.pageSize)
+    .subscribe((res: PaginatedResponse<ReceivedFile>) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.totalElements = res.totalElements;
+      this.applyFilters(); // ✅ keep filters working
+      setTimeout(() => this.adjustCardHeights(), 0);
+    });
+}
+
+  nextPage() {
+  if (this.currentPage + 1 < this.totalPages) {
+    this.currentPage++;
+    this.searchQuery.trim()
+      ? this.searchFilesWithPagination()
+      : this.loadPage();
+  }
+}
+
+prevPage() {
+  if (this.currentPage > 0) {
+    this.currentPage--;
+    this.searchQuery.trim()
+      ? this.searchFilesWithPagination()
+      : this.loadPage();
+  }
+}
+ goToPage(page: number) {
+  if (page >= 0 && page < this.totalPages) {
+    this.currentPage = page;
+
+    if (this.searchQuery.trim()) {
+      this.searchFilesWithPagination();
+    } else {
+      this.loadPage();
+    }
+  }
+}
+
+
+  //✅ Search with Pagination
+  searchFilesWithPagination() {
+  if (!this.searchQuery.trim()) {
+    this.currentPage = 0;
+    this.loadPage();
+    return;
+  }
+
+  this.http.get<PaginatedResponse<ReceivedFile>>(`http://localhost:8080/api/files/search`, {
+    params: { query: this.searchQuery, page: this.currentPage.toString(), size: this.pageSize.toString() }
+  }).subscribe({
+    next: (res) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.applyFilters(); // ✅ keep filters working
+    },
+    error: (err) => console.error('Search failed', err)
+  });
   }
 }

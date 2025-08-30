@@ -1,27 +1,40 @@
+// src/app/services/auth.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { tap } from 'rxjs/operators';
+import { CookieService } from 'ngx-cookie-service';
+import { Observable } from 'rxjs';
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class AuthService {
-  private base = 'http://localhost:8080/api/auth';
 
-  constructor(private http: HttpClient) {}
+  private apiUrl = 'http://localhost:8080/api/auth'; // your backend endpoint
 
-  register(payload: {name: string, email: string, password: string}) {
-    return this.http.post<any>(`${this.base}/register`, payload).pipe(tap(res => this.setToken(res.token)));
+  constructor(private http: HttpClient, private cookieService: CookieService) {}
+
+  // Login API → saves JWT in cookies
+  login(credentials: { username: string, password: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/login`, credentials, { withCredentials: true });
   }
 
-  login(payload: {email: string, password: string}) {
-    return this.http.post<any>(`${this.base}/login`, payload).pipe(tap(res => this.setToken(res.token)));
+  // Save JWT in cookie (if backend doesn’t do it automatically)
+  setToken(token: string): void {
+    this.cookieService.set('jwt', token, { path: '/', secure: true, sameSite: 'Strict' });
   }
 
-  setToken(token: string) { localStorage.setItem('token', token); }
-  get token() { return localStorage.getItem('token'); }
-  logout() { localStorage.removeItem('token'); }
+  // Get JWT from cookies
+  getToken(): string | null {
+    return this.cookieService.get('jwt') || null;
+  }
 
-  oauth(provider: 'google'|'microsoft') {
-    const map = { google: '/oauth2/authorization/google', microsoft: '/oauth2/authorization/azure' } as const;
-    window.location.href = `http://localhost:8080${map[provider]}`;
+  // Remove JWT from cookies
+  logout(): void {
+    this.cookieService.delete('jwt', '/');
+  }
+
+  // Check if logged in
+  isLoggedIn(): boolean {
+    return !!this.getToken();
   }
 }
