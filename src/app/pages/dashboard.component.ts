@@ -3,12 +3,30 @@ import { CommonModule } from '@angular/common';
 import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
 import { SidebarComponent } from './sidebar.component';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+
+interface FetchFileResponse {
+  id: number;
+  fileName: string;
+  description: string;
+  category: string;
+  date: string;   // LocalDate comes as string
+}
+
+interface FetchFilesResponse {
+  fetchFiles: FetchFileResponse[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  lastPage: boolean;
+}
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, NgChartsModule, SidebarComponent],
-  template: `
+  imports: [CommonModule, NgChartsModule, SidebarComponent, HttpClientModule],
+    template: `
     <div class="layout" [class.sidebar-closed]="isSidebarClosed">
       <!-- Hamburger (only if sidebar is closed) -->
       <button class="hamburger" *ngIf="isSidebarClosed" (click)="toggleSidebar()">
@@ -145,37 +163,130 @@ import { SidebarComponent } from './sidebar.component';
       .circle-card { flex: 1 1 100%; }
     }
   `]
+
 })
 export class DashboardComponent implements OnInit {
   isSidebarClosed = false;
   @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
 
-  ngOnInit() { this.checkScreenSize(); }
+  recentUploads: { name: string; category: string; date: string }[] = [];
+  categoryStats: { label: string; value: number }[] = [];
+
+  public lineChartData: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
+  public lineChartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#f9fafb' } } },
+    scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } }
+  };
+
+  public doughnutChartData: ChartConfiguration<'doughnut'>['data'] = { labels: [], datasets: [{ data: [], backgroundColor: [] }] };
+  public doughnutChartOptions: ChartOptions<'doughnut'> = { responsive: true, plugins: { legend: { display: false } } };
+
+  public barChartData: ChartConfiguration<'bar'>['data'] = { labels: [], datasets: [{ label: 'Files', data: [], backgroundColor: '#3b82f6' }] };
+  public barChartOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#f9fafb' } } },
+    scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } }
+  };
+
+  public miniLineChartData: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
+  public miniLineChartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } }
+  };
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() {
+    this.checkScreenSize();
+    this.fetchDashboardData();
+  }
+
   @HostListener('window:resize') onResize() { this.checkScreenSize(); }
   checkScreenSize() { this.isSidebarClosed = window.innerWidth <= 992; }
   onSidebarToggle(state: boolean) { this.isSidebarClosed = state; }
   toggleSidebar() { if (this.sidebar) this.sidebar.toggleSidebar(); }
 
-  // Dummy Data
-  recentUploads = [
-    { name: 'aadhaar.pdf', category: 'Aadhaar', date: '2025-08-28' },
-    { name: 'pan.png', category: 'PAN', date: '2025-08-27' },
-    { name: 'marksheet.pdf', category: 'College Marksheets', date: '2025-08-26' }
-  ];
-  categoryStats = [
-    { label: 'Aadhaar', value: 4 }, { label: 'PAN', value: 6 },
-    { label: 'ID Proof', value: 3 }, { label: 'Insurance', value: 5 },
-    { label: 'College', value: 7 }, { label: 'Asset Docs', value: 2 },
-    { label: 'Other', value: 4 }, { label: 'Residence', value: 6 }
-  ];
-  public lineChartData: ChartConfiguration<'line'>['data'] = { labels: Array.from({length: 12}, (_, i) => `Day ${i+1}`), datasets: [{ data: [3,5,5,6,6,7,6,6,7,8,7,7], label: 'Uploads', fill: true, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.2)', tension: 0.3 }] };
-  public lineChartOptions: ChartOptions<'line'> = { responsive: true, plugins: { legend: { labels: { color: '#f9fafb' } } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
-  public doughnutChartData: ChartConfiguration<'doughnut'>['data'] = { labels: this.categoryStats.map(c => c.label), datasets: [{ data: this.categoryStats.map(c => c.value), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#8b5cf6','#14b8a6','#e11d48'] }] };
-  public doughnutChartOptions: ChartOptions<'doughnut'> = { responsive: true, plugins: { legend: { display: false } } };
-  public barChartData: ChartConfiguration<'bar'>['data'] = { labels: this.categoryStats.map(c => c.label), datasets: [{ label: 'Files', data: this.categoryStats.map(c => c.value), backgroundColor: '#3b82f6' }] };
-  public barChartOptions: ChartOptions<'bar'> = { responsive: true, plugins: { legend: { labels: { color: '#f9fafb' } } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
-  public miniLineChartData: ChartConfiguration<'line'>['data'] = { labels: ['Mon','Tue','Wed','Thu','Fri','Sat'], datasets: [{ data: [2,3,4,3,5,6], label: 'Top Category', borderColor: '#10b981', fill: false, tension: 0.3 }] };
-  public miniLineChartOptions: ChartOptions<'line'> = { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }}, y: { ticks: { color: '#94a3b8' } } } };
+  // ✅ Fetch data from backend
+  fetchDashboardData() {
+    this.http.get<FetchFilesResponse>('http://localhost:8080/api/files').subscribe({
+      next: (res) => {
+        const files = res.fetchFiles || [];
 
-  get chartColors(): string[] { return this.doughnutChartData.datasets[0].backgroundColor as string[]; }
+        // 📑 Recent Uploads (latest 5)
+        this.recentUploads = [...files]
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5)
+          .map(f => ({ name: f.fileName, category: f.category, date: f.date }));
+
+        // 📂 Category Stats
+        const categoryMap: Record<string, number> = {};
+        files.forEach(f => {
+          categoryMap[f.category] = (categoryMap[f.category] || 0) + 1;
+        });
+        this.categoryStats = Object.keys(categoryMap).map(k => ({ label: k, value: categoryMap[k] }));
+
+        // 📈 Uploads Summary (last 12 days)
+        const last12Days: string[] = [];
+        const today = new Date();
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          last12Days.push(d.toISOString().split('T')[0]); // yyyy-MM-dd
+        }
+        const uploadsByDay: number[] = last12Days.map(day =>
+          files.filter(f => f.date === day).length
+        );
+        this.lineChartData = {
+          labels: last12Days.map(d => d.slice(5)), // MM-dd
+          datasets: [{
+            data: uploadsByDay,
+            label: 'Uploads',
+            fill: true,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.2)',
+            tension: 0.3
+          }]
+        };
+
+        // 📊 Doughnut & Bar (Category Distribution)
+        const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#8b5cf6','#14b8a6','#e11d48'];
+        this.doughnutChartData = {
+          labels: this.categoryStats.map(c => c.label),
+          datasets: [{
+            data: this.categoryStats.map(c => c.value),
+            backgroundColor: colors
+          }]
+        };
+        this.barChartData = {
+          labels: this.categoryStats.map(c => c.label),
+          datasets: [{ label: 'Files', data: this.categoryStats.map(c => c.value), backgroundColor: '#3b82f6' }]
+        };
+
+        // 🔥 Most Uploaded Trend (top category uploads over days)
+        const topCategory = this.categoryStats.sort((a,b)=>b.value-a.value)[0]?.label;
+        if (topCategory) {
+          const trendData = last12Days.map(day =>
+            files.filter(f => f.category === topCategory && f.date === day).length
+          );
+          this.miniLineChartData = {
+            labels: last12Days.map(d => d.slice(5)),
+            datasets: [{
+              data: trendData,
+              label: topCategory,
+              borderColor: '#10b981',
+              fill: false,
+              tension: 0.3
+            }]
+          };
+        }
+      },
+      error: (err) => console.error('Failed to fetch dashboard data', err)
+    });
+  }
+
+  get chartColors(): string[] {
+    return this.doughnutChartData.datasets[0].backgroundColor as string[];
+  }
 }

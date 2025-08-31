@@ -3,6 +3,22 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from './sidebar.component';
 
+interface AuditLogResponse {
+  username: string;
+  action: string;
+  filename?: string;
+  timestamp: string;
+}
+
+interface AuditLogsResponse {
+  auditLogList: AuditLogResponse[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  lastPage: boolean;
+}
+
 @Component({
   selector: 'app-history',
   standalone: true,
@@ -18,26 +34,46 @@ import { SidebarComponent } from './sidebar.component';
         <p class="quote">Track all your recent actions and activities</p>
 
         <div class="card">
-          <!-- Loading State -->
-          <p *ngIf="loading" class="loading">Loading activities...</p>
+  <!-- Loading State -->
+  <p *ngIf="loading" class="loading">Loading activities...</p>
 
-          <!-- Error State -->
-          <p *ngIf="error" class="error">{{ error }}</p>
+  <!-- Error State -->
+  <p *ngIf="error" class="error">{{ error }}</p>
 
-          <!-- Activities List -->
-          <div *ngIf="!loading && activities.length > 0">
-            <h2 class="section-title">Recent Activities</h2>
-            <ul class="activity-list">
-              <li *ngFor="let activity of activities">
-                <div class="activity-message">{{ activity.message }}</div>
-                <div class="activity-time">{{ activity.time | date:'medium' }}</div>
-              </li>
-            </ul>
+  <!-- Only show content when not loading -->
+  <div *ngIf="!loading">
+    <!-- 🔹 Pagination ABOVE activities -->
+    
+
+    <!-- Activities List -->
+    <div *ngIf="activities.length > 0; else emptyState">
+      <h2 class="section-title">Recent Activities</h2>
+      <ul class="activity-list">
+        <li *ngFor="let activity of activities" class="activity-item">
+          <div class="activity-left">
+            <div class="activity-user">{{ activity.username }}</div>
+            <div class="activity-action">
+              {{ activity.action }}
+              <span *ngIf="activity.filename">: {{ activity.filename }}</span>
+            </div>
           </div>
+          <div class="activity-time">{{ activity.timestamp | date:'medium' }}</div>
+        </li>
+      </ul>
+    </div>
 
-          <!-- Empty State -->
-          <p *ngIf="!loading && activities.length === 0" class="empty">No activities found</p>
-        </div>
+    <!-- Empty State -->
+    <ng-template #emptyState>
+      <p class="empty">No activities found</p>
+    </ng-template>
+    <div class="pagination">
+      <button (click)="prevPage()" [disabled]="pageNumber === 0">Prev</button>
+      <span>Page {{ pageNumber + 1 }} of {{ totalPages }}</span>
+      <button (click)="nextPage()" [disabled]="lastPage">Next</button>
+    </div>
+  </div>
+</div>
+
       </div>
     </div>
   `,
@@ -45,7 +81,7 @@ import { SidebarComponent } from './sidebar.component';
     .layout {
       display: flex;
       min-height: 100vh;
-      background: #f9fafb;
+      background: #ffffffff;
       font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       transition: all 0.3s ease;
     }
@@ -64,7 +100,7 @@ import { SidebarComponent } from './sidebar.component';
     .content {
       flex: 1;
       padding: 40px;
-      background: #f9fafb;
+      background: #ffffffff;
       transition: padding 0.3s ease;
       min-width: 0;
     }
@@ -98,6 +134,7 @@ import { SidebarComponent } from './sidebar.component';
     .card:hover {
       transform: translateY(-3px);
       box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+      transform: scale(1.05);
     }
 
     .section-title {
@@ -113,25 +150,39 @@ import { SidebarComponent } from './sidebar.component';
       margin: 0;
     }
 
-    .activity-list li {
-      padding: 14px;
+    .activity-item {
+      padding: 16px;
       margin-bottom: 12px;
       background: #f3f4f6;
-      border-radius: 10px;
+      border-radius: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      transition: background 0.2s ease;
+      transition: all 0.25s ease-in-out;
+      transform: scale(1);
     }
 
-    .activity-list li:hover {
+    .activity-item:hover {
       background: #e5e7eb;
+      transform: scale(1.02);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.08);
     }
 
-    .activity-message {
+    .activity-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .activity-user {
       font-size: 15px;
-      font-weight: 500;
+      font-weight: 600;
+      color: #1d4ed8;
+    }
+
+    .activity-action {
+      font-size: 14px;
       color: #111827;
+      margin-top: 2px;
     }
 
     .activity-time {
@@ -149,6 +200,28 @@ import { SidebarComponent } from './sidebar.component';
     .error {
       color: #dc2626;
       font-weight: 600;
+    }
+
+    .pagination {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+    }
+    .pagination button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .pagination button[disabled] {
+      background: #9ca3af;
+      cursor: not-allowed;
     }
 
     @media (max-width: 992px) {
@@ -169,9 +242,14 @@ import { SidebarComponent } from './sidebar.component';
 })
 export class HistoryComponent implements OnInit {
   isSidebarClosed = false;
-  activities: any[] = [];
+  activities: AuditLogResponse[] = [];
   loading = true;
   error = '';
+
+  pageNumber = 0;
+  pageSize = 5;
+  totalPages = 0;
+  lastPage = false;
 
   constructor(private http: HttpClient) {}
 
@@ -197,10 +275,15 @@ export class HistoryComponent implements OnInit {
   }
 
   fetchActivities() {
-    this.http.get<any[]>('http://localhost:8080/api/activities')  // Replace with your backend API
+    this.loading = true;
+    this.http.get<AuditLogsResponse>(`http://localhost:8080/api/auditlogs?page=${this.pageNumber}&size=${this.pageSize}`)
       .subscribe({
-        next: (data) => {
-          this.activities = data;
+        next: (response) => {
+          this.activities = response.auditLogList;
+          this.pageNumber = response.pageNumber;
+          this.pageSize = response.pageSize;
+          this.totalPages = response.totalPages;
+          this.lastPage = response.lastPage;
           this.loading = false;
         },
         error: () => {
@@ -208,5 +291,19 @@ export class HistoryComponent implements OnInit {
           this.loading = false;
         }
       });
+  }
+
+  nextPage() {
+    if (!this.lastPage) {
+      this.pageNumber++;
+      this.fetchActivities();
+    }
+  }
+
+  prevPage() {
+    if (this.pageNumber > 0) {
+      this.pageNumber--;
+      this.fetchActivities();
+    }
   }
 }
