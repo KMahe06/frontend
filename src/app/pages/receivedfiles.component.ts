@@ -278,33 +278,40 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
   }
 
   fetchReceivedFiles() {
-    this.http.get<ReceivedFile[]>('http://localhost:8080/api/received-files').subscribe({
-      next: (res) => {
-        this.allFiles = res;
-        this.applyFilters();
-        this.syncToMyWallet(res); // <-- automatically push to wallet
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => console.error('Failed to fetch received files', err)
-    });
+  this.http.get<PaginatedResponse<ReceivedFile>>(
+    'http://localhost:8080/api/shared-files/to-me',
+    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
+  ).subscribe({
+    next: (res) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.totalElements = res.totalElements;
+      this.applyFilters();
+      setTimeout(() => this.adjustCardHeights(), 0);
+    },
+    error: (err) => console.error('Failed to fetch received files', err)
+  });
+}
+
+ searchFiles() {
+  if (!this.searchQuery.trim()) {
+    this.fetchReceivedFiles();
+    return;
   }
 
-  searchFiles() {
-    if (!this.searchQuery.trim()) {
-      this.fetchReceivedFiles();
-      return;
-    }
-
-    this.http.get<ReceivedFile[]>(`http://localhost:8080/api/received-files/search?query=${this.searchQuery}`).subscribe({
-      next: (res) => {
-        this.allFiles = res;
-        this.applyFilters();
-        this.syncToMyWallet(res); // <-- also sync search results to wallet
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => console.error('Search failed', err)
-    });
-  }
+  this.http.get<PaginatedResponse<ReceivedFile>>(
+    'http://localhost:8080/api/shared-files/to-me',
+    { params: { keyword: this.searchQuery, pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
+  ).subscribe({
+    next: (res) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.applyFilters();
+      setTimeout(() => this.adjustCardHeights(), 0);
+    },
+    error: (err) => console.error('Search failed', err)
+  });
+}
 
   setFilter(type: 'all' | 'sensitive' | 'insensitive') {
     this.filterType = type;
@@ -348,14 +355,16 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
   totalElements = 0;
 
 loadPage() {
-  this.paginationService.getPaginatedData<ReceivedFile>('mywallet', this.currentPage, this.pageSize)
-    .subscribe((res: PaginatedResponse<ReceivedFile>) => {
-      this.allFiles = res.fetchFiles;
-      this.totalPages = res.totalPages;
-      this.totalElements = res.totalElements;
-      this.applyFilters(); // ✅ keep filters working
-      setTimeout(() => this.adjustCardHeights(), 0);
-    });
+  this.http.get<PaginatedResponse<ReceivedFile>>(
+    'http://localhost:8080/api/shared-files/to-me',
+    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
+  ).subscribe((res: PaginatedResponse<ReceivedFile>) => {
+    this.allFiles = res.fetchFiles;
+    this.totalPages = res.totalPages;
+    this.totalElements = res.totalElements;
+    this.applyFilters();
+    setTimeout(() => this.adjustCardHeights(), 0);
+  });
 }
 
   nextPage() {
@@ -389,22 +398,29 @@ prevPage() {
 
 
   //✅ Search with Pagination
-  searchFilesWithPagination() {
+ searchFilesWithPagination() {
   if (!this.searchQuery.trim()) {
     this.currentPage = 0;
     this.loadPage();
     return;
   }
 
-  this.http.get<PaginatedResponse<ReceivedFile>>(`http://localhost:8080/api/files/search`, {
-    params: { query: this.searchQuery, page: this.currentPage.toString(), size: this.pageSize.toString() }
-  }).subscribe({
+  this.http.get<PaginatedResponse<ReceivedFile>>(
+    'http://localhost:8080/api/shared-files/to-me',
+    {
+      params: {
+        keyword: this.searchQuery,
+        pageNumber: this.currentPage.toString(),
+        pageSize: this.pageSize.toString()
+      }
+    }
+  ).subscribe({
     next: (res) => {
       this.allFiles = res.fetchFiles;
       this.totalPages = res.totalPages;
-      this.applyFilters(); // ✅ keep filters working
+      this.applyFilters();
     },
     error: (err) => console.error('Search failed', err)
   });
-  }
+}
 }

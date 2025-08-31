@@ -279,15 +279,20 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
   }
 
   fetchSharedFiles() {
-    this.http.get<SharedFile[]>('http://localhost:8080/api/shared-files').subscribe({
-      next: (res) => {
-        this.allFiles = res;
-        this.applyFilters();
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => console.error('Failed to fetch shared files', err)
-    });
-  }
+  this.http.get<PaginatedResponse<SharedFile>>(
+    'http://localhost:8080/api/shared-files/by-me',
+    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
+  ).subscribe({
+    next: (res) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.totalElements = res.totalElements;
+      this.applyFilters();
+      setTimeout(() => this.adjustCardHeights(), 0);
+    },
+    error: (err) => console.error('Failed to fetch shared files', err)
+  });
+}
 
   searchFiles() {
     if (!this.searchQuery.trim()) {
@@ -339,16 +344,18 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
     pageSize = 6;   // ✅ match backend
     totalElements = 0;
   
-  loadPage() {
-    this.paginationService.getPaginatedData<SharedFile>('mywallet', this.currentPage, this.pageSize)
-      .subscribe((res: PaginatedResponse<SharedFile>) => {
-        this.allFiles = res.fetchFiles;
-        this.totalPages = res.totalPages;
-        this.totalElements = res.totalElements;
-        this.applyFilters(); // ✅ keep filters working
-        setTimeout(() => this.adjustCardHeights(), 0);
-      });
-  }
+ loadPage() {
+  this.http.get<PaginatedResponse<SharedFile>>(
+    'http://localhost:8080/api/shared-files/by-me',
+    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
+  ).subscribe((res: PaginatedResponse<SharedFile>) => {
+    this.allFiles = res.fetchFiles;
+    this.totalPages = res.totalPages;
+    this.totalElements = res.totalElements;
+    this.applyFilters();
+    setTimeout(() => this.adjustCardHeights(), 0);
+  });
+}
   
     nextPage() {
     if (this.currentPage + 1 < this.totalPages) {
@@ -382,21 +389,26 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
   
     //✅ Search with Pagination
     searchFilesWithPagination() {
-    if (!this.searchQuery.trim()) {
-      this.currentPage = 0;
-      this.loadPage();
-      return;
+  if (!this.searchQuery.trim()) {
+    this.currentPage = 0;
+    this.loadPage();
+    return;
+  }
+
+  this.http.get<PaginatedResponse<SharedFile>>(`http://localhost:8080/api/shared-files/by-me`, {
+    params: { 
+      keyword: this.searchQuery,
+      pageNumber: this.currentPage.toString(),
+      pageSize: this.pageSize.toString()
     }
-  
-    this.http.get<PaginatedResponse<SharedFile>>(`http://localhost:8080/api/files/search`, {
-      params: { query: this.searchQuery, page: this.currentPage.toString(), size: this.pageSize.toString() }
-    }).subscribe({
-      next: (res) => {
-        this.allFiles = res.fetchFiles;
-        this.totalPages = res.totalPages;
-        this.applyFilters(); // ✅ keep filters working
-      },
-      error: (err) => console.error('Search failed', err)
-    });
-    }
+  }).subscribe({
+    next: (res) => {
+      this.allFiles = res.fetchFiles;
+      this.totalPages = res.totalPages;
+      this.applyFilters(); 
+    },
+    error: (err) => console.error('Search failed', err)
+  });
+}
+
 }

@@ -422,35 +422,33 @@ export class UploadComponent implements OnInit {
   }
 
   private uploadFiles() {
-    if (!this.selectedFiles.length) return;
- if (!this.selectedFiles.length) return;
+  if (!this.selectedFiles.length) return;
 
-    const categoryToSend = this.selectedCategory === 'other' ? this.customCategory.trim() : this.selectedCategory;
+  const categoryToSend = this.selectedCategory === 'other' ? this.customCategory.trim() : this.selectedCategory;
 
-    // Post each file individually to keep your existing single-file endpoint
-    const requests = this.selectedFiles.map((file, i) => {
-      const fd = new FormData();
-      fd.append('file', file); // same field name, one file per request
-      const params = new URLSearchParams({
-        filename: (this.manualFileNames[i] || file.name).trim(),
-        description: this.description || '',
-        category: categoryToSend
-      }).toString();
-      return this.http.post(`http://localhost:8080/api/files/upload/file?${params}`, fd);
-    });
+  // Post all files together (backend expects MultipartFile[] "files")
+  const fd = new FormData();
+  this.selectedFiles.forEach(file => {
+    fd.append('files', file);  // ✅ corrected field name
+  });
 
-    forkJoin(requests).subscribe({
+  const params = new URLSearchParams({
+    description: this.description || '',
+    category: categoryToSend
+  }).toString();
+
+  this.http.post(`http://localhost:8080/api/files/upload?${params}`, fd)  // ✅ corrected endpoint
+    .subscribe({
       next: () => {
         this.uploadSuccess = true;
         this.uploadMessage = '✅ File(s) uploaded successfully!';
-        // Optional: clear after success
-        // this.clearAll();
       },
       error: () => {
         this.uploadSuccess = false;
         this.uploadMessage = '❌ Failed to upload file(s). Please try again.';
       }
     });
-  }
+}
+   
 }
 

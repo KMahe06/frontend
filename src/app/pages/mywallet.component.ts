@@ -4,7 +4,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from './sidebar.component';
 import { Router } from '@angular/router';
-import { PaginationService,PaginatedResponse } from '../core/pagination';
+import { PaginationService, PaginatedResponse } from '../core/pagination';
 
 interface FileData {
   id: number;
@@ -54,11 +54,12 @@ interface FileData {
               <strong>Category:</strong> {{ file.category === 'other' ? file.customCategory : file.category }}
             </p>
 
-            <div class="card-actions">
+            <div class="card-actions-inline">
               <button class="btn btn-download" (click)="downloadFile(file, $event)">Download</button>
               <button class="btn btn-share" (click)="shareFile(file, $event)">Share</button>
-              <button class="btn btn-delete-me" (click)="deleteForMe(file, $event)">Delete for Me</button>
-              <button class="btn btn-delete-everyone" (click)="deleteForEveryone(file, $event)">Delete for Everyone</button>
+            </div>
+            <div class="card-actions-delete">
+              <button class="btn btn-delete" (click)="deleteFile(file, $event)">Delete</button>
             </div>
           </div>
         </div>
@@ -76,7 +77,7 @@ interface FileData {
       display: flex;
       min-height: 100vh;
       width: 100%;
-       font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       transition: all 0.3s ease;
       background: #f9fafb;
     }
@@ -166,13 +167,35 @@ interface FileData {
       color: #1e3a8a;
     }
 
-    /* Card Actions */
-    .card-actions {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
+    /* Inline actions */
+    .card-actions-inline {
+      display: flex;
       gap: 10px;
+      margin-top: 12px;
     }
+    .card-actions-inline .btn {
+      flex: 1;
+    }
+
+    /* Delete full width */
+    .card-actions-delete {
+      margin-top: 10px;
+    }
+    .btn-delete {
+      width: 100%;
+      background: #dc2626;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s ease;
+    }
+    .btn-delete:hover {
+      background: #991b1b;
+      transform: translateY(-2px) scale(1.02);
+    }
+
     .btn {
       padding: 10px 14px;
       border: none;
@@ -199,20 +222,6 @@ interface FileData {
     }
     .btn-share:hover {
       background: #15803d;
-    }
-    .btn-delete-me {
-      background: #f59e0b;
-      color: white;
-    }
-    .btn-delete-me:hover {
-      background: #b45309;
-    }
-    .btn-delete-everyone {
-      background: #dc2626;
-      color: white;
-    }
-    .btn-delete-everyone:hover {
-      background: #991b1b;
     }
 
     /* Active Card */
@@ -289,7 +298,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
   @ViewChildren('cardEl') cardElements!: QueryList<ElementRef>;
 
-  constructor(private http: HttpClient, private router: Router,private paginationService:PaginationService) {}
+  constructor(private http: HttpClient, private router: Router, private paginationService: PaginationService) {}
 
   ngOnInit() {
     this.checkScreenSize();
@@ -334,7 +343,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
       this.fetchFiles();
       return;
     }
-    this.http.get<FileData[]>(`http://localhost:8080/api/files/search?query=${this.searchQuery}`).subscribe({
+    this.http.get<FileData[]>(`http://localhost:8080/api/files/search?keyword=${this.searchQuery}`).subscribe({
       next: (res) => {
         this.files = res;
         setTimeout(() => this.adjustCardHeights(), 0);
@@ -364,24 +373,16 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
     this.router.navigate(['/sensitivity', file.id]);
   }
 
-  deleteForMe(file: FileData, event: MouseEvent) {
+  // ✅ Unified delete
+  deleteFile(file: FileData, event: MouseEvent) {
     event.stopPropagation();
-    this.http.delete(`http://localhost:8080/api/files/delete-for-me/${file.id}`).subscribe({
-      next: () => {
-        this.files = this.files.filter(f => f.id !== file.id);
-      },
-      error: (err) => { console.error('Delete for me failed', err); }
-    });
-  }
-
-  deleteForEveryone(file: FileData, event: MouseEvent) {
-    event.stopPropagation();
-    this.http.delete(`http://localhost:8080/api/files/delete-for-everyone/${file.id}`).subscribe({
-      next: () => {
-        this.files = this.files.filter(f => f.id !== file.id);
-      },
-      error: (err) => { console.error('Delete for everyone failed', err); }
-    });
+    this.http.post(`http://localhost:8080/api/files/delete/${file.id}`, {})
+      .subscribe({
+        next: () => {
+          this.files = this.files.filter(f => f.id !== file.id);
+        },
+        error: (err) => { console.error('Delete failed', err); }
+      });
   }
 
   selectCard(file: FileData) {
@@ -400,15 +401,13 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
       card.nativeElement.style.height = maxHeight + 'px';
     });
   }
-   
-
 
   currentPage = 0;
   totalPages = 0;
   pageSize = 6;   // ✅ match backend
   totalElements = 0;
 
- loadPage() {
+  loadPage() {
     this.paginationService.getPaginatedData<FileData>('mywallet', this.currentPage, this.pageSize)
       .subscribe((res: PaginatedResponse<FileData>) => {
         this.files = res.fetchFiles;
@@ -419,34 +418,33 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   }
 
   nextPage() {
-  if (this.currentPage + 1 < this.totalPages) {
-    this.currentPage++;
-    this.searchQuery.trim()
-      ? this.searchFilesWithPagination()
-      : this.loadPage();
-  }
-}
-
-prevPage() {
-  if (this.currentPage > 0) {
-    this.currentPage--;
-    this.searchQuery.trim()
-      ? this.searchFilesWithPagination()
-      : this.loadPage();
-  }
-}
- goToPage(page: number) {
-  if (page >= 0 && page < this.totalPages) {
-    this.currentPage = page;
-
-    if (this.searchQuery.trim()) {
-      this.searchFilesWithPagination();
-    } else {
-      this.loadPage();
+    if (this.currentPage + 1 < this.totalPages) {
+      this.currentPage++;
+      this.searchQuery.trim()
+        ? this.searchFilesWithPagination()
+        : this.loadPage();
     }
   }
-}
 
+  prevPage() {
+    if (this.currentPage > 0) {
+      this.currentPage--;
+      this.searchQuery.trim()
+        ? this.searchFilesWithPagination()
+        : this.loadPage();
+    }
+  }
+
+  goToPage(page: number) {
+    if (page >= 0 && page < this.totalPages) {
+      this.currentPage = page;
+      if (this.searchQuery.trim()) {
+        this.searchFilesWithPagination();
+      } else {
+        this.loadPage();
+      }
+    }
+  }
 
   //✅ Search with Pagination
   searchFilesWithPagination() {
@@ -457,7 +455,7 @@ prevPage() {
     }
 
     this.http.get<PaginatedResponse<FileData>>(`http://localhost:8080/api/files/search`, {
-      params: { query: this.searchQuery, page: this.currentPage.toString(), size: this.pageSize.toString() }
+      params: { keyword: this.searchQuery, pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() }
     }).subscribe({
       next: (res) => {
         this.files = res.fetchFiles;
