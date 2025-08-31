@@ -91,7 +91,7 @@ export class RegisterComponent {
       return;
     }
     this.loading = true;
-    this.http.post('http://localhost:8080/api/auth/generate-otp', { email: this.email })
+    this.http.post('http://localhost:8080/api/otp/send', { email: this.email })
       .subscribe({
         next: () => {
           this.loading = false;
@@ -113,7 +113,7 @@ export class RegisterComponent {
       return;
     }
     this.loading = true;
-    this.http.post('http://localhost:8080/api/auth/verify-otp', { email: this.email, otp: this.otp })
+    this.http.post('http://localhost:8080/api/otp/verify', { email: this.email, otp: this.otp })
       .subscribe({
         next: () => {
           this.loading = false;
@@ -136,8 +136,8 @@ export class RegisterComponent {
       return;
     }
     this.loading = true;
-    this.http.post('http://localhost:8080/api/auth/register', {
-      name: this.name,
+    this.http.post('http://localhost:8080/api/auth/signup', {
+      username: this.name,
       email: this.email,
       password: this.password
     }).subscribe({

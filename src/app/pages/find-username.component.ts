@@ -72,7 +72,7 @@ export class ForgotUsernameComponent {
       return;
     }
 
-    this.http.post('http://localhost:8080/api/auth/forgot-username', { email: this.email })
+    this.http.post('http://localhost:8080/api/user-utils/find-username', { email: this.email })
       .subscribe({
         next: (res: any) => {
           alert(`Your username has been sent to: ${this.email}`);

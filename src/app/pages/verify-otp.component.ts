@@ -7,12 +7,11 @@ import { HttpClient } from '@angular/common/http';
 @Component({
   selector: 'app-verify-otp',
   standalone: true,
-  imports: [CommonModule, FormsModule,RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
   <section class="card">
     <div class="header">
       <h1>Verify OTP</h1>
-      
       <p>We have sent an OTP to your registered email.</p>
     </div>  
 
@@ -44,8 +43,6 @@ import { HttpClient } from '@angular/common/http';
     .input:focus { border:1px solid #4f46e5; outline:none; }
     .btn { width:100%; padding:14px; border-radius:12px; border:none; cursor:pointer; background:darkblue; color:#fff; font-weight:600; font-size:16px; margin-bottom:14px; }
     .btn:hover { background:linear-gradient(90deg,#4f46e5,#3730a3); }
-    .btn.google { background:linear-gradient(90deg,#2628ad,#4f46e5); color:#fff; }
-    .btn.microsoft { background:linear-gradient(90deg,#2628ad,#4f46e5); color:#fff; }
     .error { color:#ef4444; font-size:14px; text-align:center; }
     @media(max-width:480px){ .card{ max-width:90%; padding:20px; } .header h1{ font-size:24px; } }
   `]
@@ -53,17 +50,33 @@ import { HttpClient } from '@angular/common/http';
 export class VerifyOtpComponent {
   otp = '';
   error = '';
+  username: string | null;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router) {
+    this.username = localStorage.getItem('username'); // ✅ fetch username from login step
+  }
 
- verify() {
-  this.http.post('http://localhost:8080/api/auth/verify-otp', { otp: this.otp }).subscribe({
+  verify() {
+    if (!this.otp.trim()) {
+      this.error = 'OTP is required';
+      return;
+    }
+    if (!this.username) {
+      this.error = 'No username found in session. Please login again.';
+      return;
+    }
+this.http.post('http://localhost:8080/api/auth/verify-otp', {
+    username: this.username,
+    otp: this.otp
+  }, { withCredentials: true })   // 👈 IMPORTANT
+  .subscribe({
     next: (res: any) => {
-      localStorage.setItem('token', res.token); // Save the final JWT token
-      this.router.navigateByUrl('/dashboard');  // ✅ Go to Dashboard
+      // Cookie will now be automatically stored by browser if backend sets it with HttpOnly
+      // You don’t need to manually save token anymore if you use cookies
+      this.router.navigateByUrl('/dashboard');
     },
     error: err => this.error = err?.error?.message || 'OTP verification failed'
   });
-}
 
+  }
 }

@@ -210,7 +210,7 @@ export class DashboardComponent implements OnInit {
 
   // ✅ Fetch data from backend
   fetchDashboardData() {
-    this.http.get<FetchFilesResponse>('http://localhost:8080/api/files').subscribe({
+    this.http.get<FetchFilesResponse>('http://localhost:8080/api/files/fetch-all').subscribe({
       next: (res) => {
         const files = res.fetchFiles || [];
 

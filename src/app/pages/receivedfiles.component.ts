@@ -6,12 +6,12 @@ import { SidebarComponent } from './sidebar.component';
 import { PaginationService,PaginatedResponse } from '../core/pagination';
 import { Router } from '@angular/router';
 interface ReceivedFile {
-  id: number;
   senderName: string;
-  receiverName: string;
+  recipientName: string;
   filename: string;
   category: string;
   isSensitive: boolean;
+
 }
 
 @Component({
@@ -53,7 +53,7 @@ interface ReceivedFile {
           >
             <h3>{{ file.filename }}</h3>
             <p><strong>Sender:</strong> {{ file.senderName }}</p>
-            <p><strong>Receiver:</strong> {{ file.receiverName }}</p>
+            <p><strong>Receiver:</strong> {{ file.recipientName }}</p>
             <p><strong>Category:</strong> {{ file.category }}</p>
             <p><strong>Sensitivity:</strong>
               <span [class.sensitive]="file.isSensitive" [class.insensitive]="!file.isSensitive">
@@ -343,12 +343,12 @@ export class ReceivedFilesComponent implements OnInit, AfterViewInit {
     });
   }
 
-  private syncToMyWallet(files: ReceivedFile[]) {
-    this.http.post('http://localhost:8080/api/mywallet', files).subscribe({
-      next: () => console.log('Files synced to MyWallet'),
-      error: (err) => console.error('Failed to sync to MyWallet', err)
-    });
-  }
+  // private syncToMyWallet(files: ReceivedFile[]) {
+  //   this.http.post('http://localhost:8080/api/shared-files/to-me', files).subscribe({
+  //     next: () => console.log('Files synced to MyWallet'),
+  //     error: (err) => console.error('Failed to sync to MyWallet', err)
+  //   });
+  // }
   currentPage = 0;
   totalPages = 0;
   pageSize = 6;   // ✅ match backend

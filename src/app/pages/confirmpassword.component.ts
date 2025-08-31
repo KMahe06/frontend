@@ -5,20 +5,43 @@ import { Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
-  selector: 'app-confirm-password',
+  selector: 'app-confirm-reset',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   template: `
   <section class="card">
     <div class="header">
       <h1>Reset Password</h1>
-      <p>Enter your new password below.</p>
+      <p>Enter the OTP sent to your email and your new password.</p>
     </div>
 
-    <form  (ngSubmit)="submit()" #f="ngForm" *ngIf="!success">
+    <!-- OTP + New Password Form -->
+    <form (ngSubmit)="resetPassword()" #resetForm="ngForm" *ngIf="!success">
       <div style="display:grid; gap:10px">
-        <input class="input" name="newPassword" [(ngModel)]="newPassword" type="password" placeholder="Enter New Password" required />
-        <input class="input" name="confirmPassword" [(ngModel)]="confirmPassword" type="password" placeholder="Confirm Password" required />
+        <input 
+          class="input" 
+          name="otp" 
+          [(ngModel)]="otp" 
+          type="text" 
+          placeholder="Enter OTP" 
+          required />
+
+        <input 
+          class="input" 
+          name="newPassword" 
+          [(ngModel)]="newPassword" 
+          type="password" 
+          placeholder="Enter New Password" 
+          required />
+
+        <input 
+          class="input" 
+          name="confirmPassword" 
+          [(ngModel)]="confirmPassword" 
+          type="password" 
+          placeholder="Confirm Password" 
+          required />
+
         <button class="btn" type="submit">Update Password</button>
       </div>
     </form>
@@ -26,12 +49,12 @@ import { HttpClient } from '@angular/common/http';
     <!-- Success Message -->
     <div *ngIf="success" style="text-align:center;">
       <p style="color:green; font-weight:600;">✅ Password changed successfully!</p>
-      
     </div>
+
     <button type="button" class="btn secondary" routerLink="/" 
-        style="background:#0b1020;border:1px solid rgba(255,255,255,0.1)">
-        Back to Sign In
-      </button>
+      style="background:#0b1020;border:1px solid rgba(255,255,255,0.1)">
+      Back to Sign In
+    </button>
 
     <!-- Error Message -->
     <div *ngIf="error" class="error" style="margin-top:8px">{{error}}</div>
@@ -68,30 +91,38 @@ import { HttpClient } from '@angular/common/http';
   `]
 })
 export class ConfirmPasswordComponent {
+  otp = '';
   newPassword = '';
   confirmPassword = '';
   error = '';
   success = false;
+  email: string | null = '';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router) {
+    this.email = localStorage.getItem('resetEmail'); // ✅ email from forgot password
+  }
 
-  submit() {
-    if (!this.newPassword || !this.confirmPassword) {
+  resetPassword() {
+    if (!this.otp.trim() || !this.newPassword || !this.confirmPassword) {
       this.error = 'All fields are required';
       return;
     }
-  if (this.newPassword !== this.confirmPassword) {
-    this.error = 'Passwords do not match';
-    return;
-  }
-  this.http.post('http://localhost:8080/api/auth/reset-password', { password: this.newPassword })
-    .subscribe({
+    if (this.newPassword !== this.confirmPassword) {
+      this.error = 'Passwords do not match';
+      return;
+    }
+    this.error = '';
+    
+    this.http.post('http://localhost:8080/api/user-utils/reset', {
+      email: this.email,
+      otp: this.otp,
+      newPassword: this.newPassword
+    }).subscribe({
       next: () => {
         this.success = true;
-        setTimeout(() => this.router.navigateByUrl('/'), 1500); // ✅ auto redirect
+        setTimeout(() => this.router.navigateByUrl('/'), 2000);
       },
-      error: err => this.error = err?.error?.message || 'Failed to update password'
+      error: err => this.error = err?.error?.message || 'Failed to reset password'
     });
-}
-
+  }
 }

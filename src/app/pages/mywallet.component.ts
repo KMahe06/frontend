@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from './sidebar.component';
+import { CookieService } from 'ngx-cookie-service';
 import { Router } from '@angular/router';
-import { PaginationService, PaginatedResponse } from '../core/pagination';
 
 interface FileData {
   id: number;
@@ -13,6 +13,17 @@ interface FileData {
   category: string;
   customCategory?: string;
 }
+
+// ✅ Re-added the requested FilesResponse interface
+interface FilesResponse {
+  fetchFiles: FileData[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  lastPage: boolean;
+}
+
 
 @Component({
   selector: 'app-mywallet',
@@ -63,8 +74,8 @@ interface FileData {
             </div>
           </div>
         </div>
-       <!-- Pagination Controls -->
-       <div class="pagination">
+        <!-- Pagination Controls -->
+        <div class="pagination">
           <button (click)="prevPage()" [disabled]="currentPage === 0">Prev</button>
           <span>Page {{ currentPage + 1 }} of {{ totalPages }}</span>
           <button (click)="nextPage()" [disabled]="currentPage + 1 >= totalPages">Next</button>
@@ -298,11 +309,20 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
   @ViewChildren('cardEl') cardElements!: QueryList<ElementRef>;
 
-  constructor(private http: HttpClient, private router: Router, private paginationService: PaginationService) {}
+  // ✅ Pagination
+  currentPage = 0;
+  totalPages = 0;
+  pageSize = 6;
+  totalElements = 0;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private cookieService: CookieService
+  ) {}
 
   ngOnInit() {
     this.checkScreenSize();
-    this.fetchFiles();
     this.loadPage();
   }
 
@@ -328,33 +348,59 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
     if (this.sidebar) this.sidebar.toggleSidebar();
   }
 
-  fetchFiles() {
-    this.http.get<FileData[]>('http://localhost:8080/api/files').subscribe({
-      next: (res) => {
-        this.files = res;
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => { console.error('Failed to fetch files', err); }
-    });
+  /** ✅ Load files with pagination */
+  loadPage() {
+    // This is now directly fetching data, similar to HistoryComponent
+    this.http
+      .get<FilesResponse>(
+        `http://localhost:8080/api/files/fetch-all?pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
+        { withCredentials: true }
+      )
+      .subscribe({
+        next: (res: FilesResponse) => {
+          this.files = res.fetchFiles;
+          this.totalPages = res.totalPages;
+          this.totalElements = res.totalElements;
+          setTimeout(() => this.adjustCardHeights(), 0);
+        },
+        error: (err) => console.error('Failed to load files', err)
+      });
   }
 
-  searchFileswithApi() {
+  /** ✅ Search with pagination */
+  searchFilesWithPagination() {
     if (!this.searchQuery.trim()) {
-      this.fetchFiles();
+      this.currentPage = 0;
+      this.loadPage();
       return;
     }
-    this.http.get<FileData[]>(`http://localhost:8080/api/files/search?keyword=${this.searchQuery}`).subscribe({
-      next: (res) => {
-        this.files = res;
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => { console.error('Search failed', err); }
-    });
+
+    this.http
+      .get<FilesResponse>(
+        `http://localhost:8080/api/files/fetch-all?keyword=${this.searchQuery}&pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
+        {
+          withCredentials: true
+        }
+      )
+      .subscribe({
+        next: (res) => {
+          this.files = res.fetchFiles;
+          this.totalPages = res.totalPages;
+          this.totalElements = res.totalElements;
+          setTimeout(() => this.adjustCardHeights(), 0);
+        },
+        error: (err) => console.error('Search failed', err)
+      });
   }
 
+  /** ✅ File actions */
   downloadFile(file: FileData, event: MouseEvent) {
     event.stopPropagation();
-    this.http.get(`http://localhost:8080/api/files/download/${file.id}`, { responseType: 'blob' })
+    this.http
+      .get(`http://localhost:8080/api/files/download/${file.id}`, {
+        responseType: 'blob',
+        withCredentials: true
+      })
       .subscribe({
         next: (blob) => {
           const url = window.URL.createObjectURL(blob);
@@ -364,7 +410,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
           a.click();
           window.URL.revokeObjectURL(url);
         },
-        error: (err) => { console.error('Download failed', err); }
+        error: (err) => console.error('Download failed', err)
       });
   }
 
@@ -373,15 +419,19 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
     this.router.navigate(['/sensitivity', file.id]);
   }
 
-  // ✅ Unified delete
   deleteFile(file: FileData, event: MouseEvent) {
     event.stopPropagation();
-    this.http.post(`http://localhost:8080/api/files/delete/${file.id}`, {})
+    this.http
+      .post(
+        `http://localhost:8080/api/files/delete/${file.id}`,
+        {},
+        { withCredentials: true }
+      )
       .subscribe({
         next: () => {
-          this.files = this.files.filter(f => f.id !== file.id);
+          this.files = this.files.filter((f) => f.id !== file.id);
         },
-        error: (err) => { console.error('Delete failed', err); }
+        error: (err) => console.error('Delete failed', err)
       });
   }
 
@@ -391,32 +441,20 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
 
   private adjustCardHeights() {
     if (!this.cardElements || this.cardElements.length === 0) return;
-    this.cardElements.forEach(card => card.nativeElement.style.height = 'auto');
+    this.cardElements.forEach(
+      (card) => (card.nativeElement.style.height = 'auto')
+    );
     let maxHeight = 0;
-    this.cardElements.forEach(card => {
+    this.cardElements.forEach((card) => {
       const height = card.nativeElement.offsetHeight;
       if (height > maxHeight) maxHeight = height;
     });
-    this.cardElements.forEach(card => {
-      card.nativeElement.style.height = maxHeight + 'px';
-    });
+    this.cardElements.forEach(
+      (card) => (card.nativeElement.style.height = maxHeight + 'px')
+    );
   }
 
-  currentPage = 0;
-  totalPages = 0;
-  pageSize = 6;   // ✅ match backend
-  totalElements = 0;
-
-  loadPage() {
-    this.paginationService.getPaginatedData<FileData>('mywallet', this.currentPage, this.pageSize)
-      .subscribe((res: PaginatedResponse<FileData>) => {
-        this.files = res.fetchFiles;
-        this.totalPages = res.totalPages;
-        this.totalElements = res.totalElements;
-        setTimeout(() => this.adjustCardHeights(), 0);
-      });
-  }
-
+  /** ✅ Pagination controls */
   nextPage() {
     if (this.currentPage + 1 < this.totalPages) {
       this.currentPage++;
@@ -438,30 +476,9 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   goToPage(page: number) {
     if (page >= 0 && page < this.totalPages) {
       this.currentPage = page;
-      if (this.searchQuery.trim()) {
-        this.searchFilesWithPagination();
-      } else {
-        this.loadPage();
-      }
+      this.searchQuery.trim()
+        ? this.searchFilesWithPagination()
+        : this.loadPage();
     }
-  }
-
-  //✅ Search with Pagination
-  searchFilesWithPagination() {
-    if (!this.searchQuery.trim()) {
-      this.currentPage = 0;
-      this.loadPage();
-      return;
-    }
-
-    this.http.get<PaginatedResponse<FileData>>(`http://localhost:8080/api/files/search`, {
-      params: { keyword: this.searchQuery, pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() }
-    }).subscribe({
-      next: (res) => {
-        this.files = res.fetchFiles;
-        this.totalPages = res.totalPages;
-      },
-      error: (err) => console.error('Search failed', err)
-    });
   }
 }

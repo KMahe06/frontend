@@ -433,6 +433,7 @@ export class UploadComponent implements OnInit {
   });
 
   const params = new URLSearchParams({
+    files:this.selectedFiles.map((f, i) => this.manualFileNames[i] || f.name).join(','),
     description: this.description || '',
     category: categoryToSend
   }).toString();

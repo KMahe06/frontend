@@ -34,46 +34,44 @@ interface AuditLogsResponse {
         <p class="quote">Track all your recent actions and activities</p>
 
         <div class="card">
-  <!-- Loading State -->
-  <p *ngIf="loading" class="loading">Loading activities...</p>
+          <!-- Loading State -->
+          <p *ngIf="loading" class="loading">Loading activities...</p>
 
-  <!-- Error State -->
-  <p *ngIf="error" class="error">{{ error }}</p>
+          <!-- Error State -->
+          <p *ngIf="error" class="error">{{ error }}</p>
 
-  <!-- Only show content when not loading -->
-  <div *ngIf="!loading">
-    <!-- 🔹 Pagination ABOVE activities -->
-    
+          <!-- Only show content when not loading -->
+          <div *ngIf="!loading">
+            <!-- Activities List -->
+            <div *ngIf="activities.length > 0; else emptyState">
+              <h2 class="section-title">Recent Activities</h2>
+              <ul class="activity-list">
+                <li *ngFor="let activity of activities" class="activity-item">
+                  <div class="activity-left">
+                    <div class="activity-user">{{ activity.username }}</div>
+                    <div class="activity-action">
+                      {{ activity.action }}
+                      <span *ngIf="activity.filename">: {{ activity.filename }}</span>
+                    </div>
+                  </div>
+                  <div class="activity-time">{{ activity.timestamp | date:'medium' }}</div>
+                </li>
+              </ul>
+            </div>
 
-    <!-- Activities List -->
-    <div *ngIf="activities.length > 0; else emptyState">
-      <h2 class="section-title">Recent Activities</h2>
-      <ul class="activity-list">
-        <li *ngFor="let activity of activities" class="activity-item">
-          <div class="activity-left">
-            <div class="activity-user">{{ activity.username }}</div>
-            <div class="activity-action">
-              {{ activity.action }}
-              <span *ngIf="activity.filename">: {{ activity.filename }}</span>
+            <!-- Empty State -->
+            <ng-template #emptyState>
+              <p class="empty">No activities found</p>
+            </ng-template>
+
+            <!-- Pagination -->
+            <div class="pagination">
+              <button (click)="prevPage()" [disabled]="pageNumber === 0">Prev</button>
+              <span>Page {{ pageNumber + 1 }} of {{ totalPages }}</span>
+              <button (click)="nextPage()" [disabled]="lastPage">Next</button>
             </div>
           </div>
-          <div class="activity-time">{{ activity.timestamp | date:'medium' }}</div>
-        </li>
-      </ul>
-    </div>
-
-    <!-- Empty State -->
-    <ng-template #emptyState>
-      <p class="empty">No activities found</p>
-    </ng-template>
-    <div class="pagination">
-      <button (click)="prevPage()" [disabled]="pageNumber === 0">Prev</button>
-      <span>Page {{ pageNumber + 1 }} of {{ totalPages }}</span>
-      <button (click)="nextPage()" [disabled]="lastPage">Next</button>
-    </div>
-  </div>
-</div>
-
+        </div>
       </div>
     </div>
   `,
@@ -246,9 +244,11 @@ export class HistoryComponent implements OnInit {
   loading = true;
   error = '';
 
+  // ✅ frontend uses 0-based indexing
   pageNumber = 0;
   pageSize = 5;
   totalPages = 0;
+  totalElements = 0;
   lastPage = false;
 
   constructor(private http: HttpClient) {}
@@ -276,21 +276,22 @@ export class HistoryComponent implements OnInit {
 
   fetchActivities() {
     this.loading = true;
-    this.http.get<AuditLogsResponse>(`http://localhost:8080/api/auditlogs?page=${this.pageNumber}&size=${this.pageSize}`)
-      .subscribe({
-        next: (response) => {
-          this.activities = response.auditLogList;
-          this.pageNumber = response.pageNumber;
-          this.pageSize = response.pageSize;
-          this.totalPages = response.totalPages;
-          this.lastPage = response.lastPage;
-          this.loading = false;
-        },
-        error: () => {
-          this.error = 'Failed to load activities. Please try again.';
-          this.loading = false;
-        }
-      });
+    this.http.get<AuditLogsResponse>(
+      `http://localhost:8080/api/logs/my-logs?pageNumber=${this.pageNumber + 1}&pageSize=${this.pageSize}`, 
+      { withCredentials: true }
+    ).subscribe({
+      next: (response) => {
+        this.activities = response.auditLogList;
+        this.totalPages = response.totalPages;
+        this.totalElements = response.totalElements;
+        this.lastPage = response.lastPage;
+        this.loading = false;
+      },
+      error: () => {
+        this.error = 'Failed to load activities. Please try again.';
+        this.loading = false;
+      }
+    });
   }
 
   nextPage() {

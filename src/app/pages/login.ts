@@ -84,6 +84,7 @@ export class LoginComponent {
   username = '';   // ✅ changed from email
   password = '';
   error = '';
+ 
 
   constructor(private http: HttpClient, private router: Router, private authService: AuthService) {}
 
@@ -99,12 +100,12 @@ export class LoginComponent {
   // Direct API call
   submit() {
     this.error = '';
-    this.http.post('http://localhost:8080/api/auth/login', {
+    localStorage.setItem('username', this.username);
+    this.http.post('http://localhost:8080/api/auth/signin', {
       username: this.username,   // ✅ changed
       password: this.password
     }).subscribe({
       next: (res: any) => {
-        localStorage.setItem('token', res.token);
         this.router.navigateByUrl('/verify-otp');
       },
       error: (err: any) => this.error = err?.error?.message || 'Login failed'

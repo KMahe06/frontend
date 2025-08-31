@@ -3,11 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { SidebarComponent } from "./sidebar.component";
-
+import { Router, RouterModule } from '@angular/router';
 @Component({
   standalone: true,
   selector: 'app-settings',
-  imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent,RouterModule],
   template: `
   <div class="layout">
     <!-- Sidebar -->
@@ -230,7 +230,8 @@ import { SidebarComponent } from "./sidebar.component";
   `]
 })
 export class SettingsComponent implements OnInit {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private router: Router) {}
+
   isSidebarClosed = false;
 
   user: { username: string; email: string } | null = null;
@@ -306,7 +307,7 @@ export class SettingsComponent implements OnInit {
     if (!this.confirmDelete || !this.otpVerified) return;
 
     this.busy.delete = true;
-    this.http.delete(`/api/users/${this.user.username}`).subscribe({
+    this.http.delete(`/api/user-utils/delete-account`).subscribe({
       next: () => {
         this.busy.delete = false;
         this.deleteOk = true;
@@ -316,11 +317,25 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  onLogout() {
-    this.busy.logout = true;
-    this.http.post('/api/auth/logout', {}).subscribe({
-      next: () => { this.busy.logout = false; this.logoutOk = true; },
-      error: () => { this.busy.logout = false; }
-    });
-  }
+ onLogout() {
+  this.busy.logout = true;
+  this.http.post('/api/auth/signout', {}).subscribe({
+    next: () => {
+      this.busy.logout = false;
+      this.logoutOk = true;
+
+      // Clear session/local storage to remove user data
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+
+      // Redirect to login page
+      this.router.navigateByUrl('/');
+
+    },
+    error: () => {
+      this.busy.logout = false;
+    }
+  });
+}
+
 }

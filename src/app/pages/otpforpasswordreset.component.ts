@@ -56,7 +56,7 @@ export class otpforpasswordreset {
 
   constructor(private http: HttpClient, private router: Router) {}
 verify() {
-  this.http.post('http://localhost:8080/api/auth/verify-otp', { otp: this.otp })
+  this.http.post('http://localhost:8080/api/user-utils/reset', { otp: this.otp })
     .subscribe({
       next: () => {
         this.router.navigateByUrl('/confirmpassword'); // ✅ go to reset password page

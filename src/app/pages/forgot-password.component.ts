@@ -79,10 +79,11 @@ export class ForgotPasswordComponent {
     this.error = 'Email is required';
     return;
   }
-  this.http.post('http://localhost:8080/api/auth/forgot-password', { email: this.email })
+  this.http.post('http://localhost:8080/api/user-utils/initiate', { email: this.email })
     .subscribe({
       next: () => {
-        this.router.navigateByUrl('/otpforpasswordreset');   // ✅ go to verify-otp
+        localStorage.setItem('resetEmail', this.email); // Store email for later use
+        this.router.navigateByUrl('/confirmpassword');   // ✅ go to verify-otp
       },
       error: err => this.error = err?.error?.message || 'Failed to send reset link'
     });
@@ -90,7 +91,7 @@ export class ForgotPasswordComponent {
 
 
     this.error = ''; // clear old errors before new request
-    this.http.post('http://localhost:8080/api/auth/forgot-password', { email: this.email })
+    this.http.post('http://localhost:8080/api/user-utils/initiate', { email: this.email })
       .subscribe({
         next: (res: any) => {
           alert(`Password reset link sent to: ${this.email}`);

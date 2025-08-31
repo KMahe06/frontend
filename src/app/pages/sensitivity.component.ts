@@ -238,7 +238,7 @@ export class SensitivityComponent implements OnInit {
     }
 
     this.http.post<{ success: boolean; message?: string }>(
-      'http://localhost:8080/api/share',
+      'http://localhost:8080/api/shared-files/share',
       { fileId: this.fileId, recipientUsername: this.username, isSensitive: this.sensitivity }
     ).subscribe({
       next: (res) => {
