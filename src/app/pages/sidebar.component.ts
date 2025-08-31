@@ -1,7 +1,7 @@
 import { Component, HostListener, OnInit, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-
+import { AuthGuard } from '../core/auth.guard';
 @Component({
   selector: 'app-sidebar',
   standalone: true,

@@ -1,10 +1,21 @@
-import { Component, OnInit, HostListener, ViewChildren, QueryList, ElementRef, AfterViewInit, ViewChild } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  HostListener,
+  ViewChildren,
+  QueryList,
+  ElementRef,
+  AfterViewInit,
+  ViewChild
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from './sidebar.component';
-import { PaginationService,PaginatedResponse } from '../core/pagination';
+import { PaginationService, PaginatedResponse } from '../core/pagination';
 import { Router } from '@angular/router';
+import { CookieService } from 'ngx-cookie-service';
+
 interface SharedFile {
   id: number;
   senderName: string;
@@ -18,7 +29,8 @@ interface SharedFile {
   selector: 'app-sharedfiles',
   standalone: true,
   imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent],
-  template: `
+  providers: [CookieService],
+  template:`
     <div class="layout" [class.sidebar-closed]="isSidebarClosed">
       <!-- Hamburger -->
       <button class="hamburger" *ngIf="isSidebarClosed" (click)="toggleSidebar()">
@@ -69,6 +81,7 @@ interface SharedFile {
         </div>
       </div>
     </div>
+
   `,
   styles: [`
     .layout {
@@ -235,7 +248,7 @@ interface SharedFile {
       .card-grid { gap: 15px; }
       .file-card { padding: 15px; }
     }
-  `]
+`]
 })
 export class SharedFilesComponent implements OnInit, AfterViewInit {
   allFiles: SharedFile[] = [];
@@ -247,11 +260,22 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
   @ViewChildren('cardEl') cardElements!: QueryList<ElementRef>;
   @ViewChild(SidebarComponent) sidebar!: SidebarComponent;
 
-  
-  constructor(private http: HttpClient, private router: Router,private paginationService:PaginationService) {}
+  // ✅ Pagination
+  currentPage = 0;
+  totalPages = 0;
+  pageSize = 6; // match backend
+  totalElements = 0;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private paginationService: PaginationService,
+    private cookieService: CookieService
+  ) {}
 
   ngOnInit() {
     this.checkScreenSize();
+    this.restoreFromCookies();
     this.fetchSharedFiles();
   }
 
@@ -278,50 +302,66 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
     if (this.sidebar) this.sidebar.toggleSidebar();
   }
 
+  // ✅ Fetch with Pagination
   fetchSharedFiles() {
-  this.http.get<PaginatedResponse<SharedFile>>(
-    'http://localhost:8080/api/shared-files/by-me',
-    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
-  ).subscribe({
-    next: (res) => {
-      this.allFiles = res.fetchFiles;
-      this.totalPages = res.totalPages;
-      this.totalElements = res.totalElements;
-      this.applyFilters();
-      setTimeout(() => this.adjustCardHeights(), 0);
-    },
-    error: (err) => console.error('Failed to fetch shared files', err)
-  });
-}
+    this.http
+      .get<PaginatedResponse<SharedFile>>(
+        'http://localhost:8080/api/shared-files/by-me',
+        {
+          params: {
+            pageNumber: this.currentPage.toString(),
+            pageSize: this.pageSize.toString()
+          }
+        }
+      )
+      .subscribe({
+        next: (res) => {
+          this.allFiles = res.fetchFiles;
+          this.totalPages = res.totalPages;
+          this.totalElements = res.totalElements;
+          this.applyFilters();
+          this.saveToCookies();
+          setTimeout(() => this.adjustCardHeights(), 0);
+        },
+        error: (err) => console.error('Failed to fetch shared files', err)
+      });
+  }
 
+  // ✅ Normal search (no pagination)
   searchFiles() {
     if (!this.searchQuery.trim()) {
       this.fetchSharedFiles();
       return;
     }
 
-    this.http.get<SharedFile[]>(`http://localhost:8080/api/shared-files/search?query=${this.searchQuery}`).subscribe({
-      next: (res) => {
-        this.allFiles = res;
-        this.applyFilters();
-        setTimeout(() => this.adjustCardHeights(), 0);
-      },
-      error: (err) => console.error('Search failed', err)
-    });
+    this.http
+      .get<SharedFile[]>(
+        `http://localhost:8080/api/shared-files/search?query=${this.searchQuery}`
+      )
+      .subscribe({
+        next: (res) => {
+          this.allFiles = res;
+          this.applyFilters();
+          this.saveToCookies();
+          setTimeout(() => this.adjustCardHeights(), 0);
+        },
+        error: (err) => console.error('Search failed', err)
+      });
   }
 
   setFilter(type: 'all' | 'sensitive' | 'insensitive') {
     this.filterType = type;
     this.applyFilters();
+    this.saveToCookies();
   }
 
   private applyFilters() {
     let files = [...this.allFiles];
 
     if (this.filterType === 'sensitive') {
-      files = files.filter(f => f.isSensitive);
+      files = files.filter((f) => f.isSensitive);
     } else if (this.filterType === 'insensitive') {
-      files = files.filter(f => !f.isSensitive);
+      files = files.filter((f) => !f.isSensitive);
     }
 
     this.filteredFiles = files;
@@ -329,35 +369,41 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
 
   private adjustCardHeights() {
     if (!this.cardElements || this.cardElements.length === 0) return;
-    this.cardElements.forEach(card => card.nativeElement.style.height = 'auto');
+    this.cardElements.forEach((card) => (card.nativeElement.style.height = 'auto'));
     let maxHeight = 0;
-    this.cardElements.forEach(card => {
+    this.cardElements.forEach((card) => {
       const height = card.nativeElement.offsetHeight;
       if (height > maxHeight) maxHeight = height;
     });
-    this.cardElements.forEach(card => {
-      card.nativeElement.style.height = maxHeight + 'px';
-    });
+    this.cardElements.forEach(
+      (card) => (card.nativeElement.style.height = maxHeight + 'px')
+    );
   }
-    currentPage = 0;
-    totalPages = 0;
-    pageSize = 6;   // ✅ match backend
-    totalElements = 0;
-  
- loadPage() {
-  this.http.get<PaginatedResponse<SharedFile>>(
-    'http://localhost:8080/api/shared-files/by-me',
-    { params: { pageNumber: this.currentPage.toString(), pageSize: this.pageSize.toString() } }
-  ).subscribe((res: PaginatedResponse<SharedFile>) => {
-    this.allFiles = res.fetchFiles;
-    this.totalPages = res.totalPages;
-    this.totalElements = res.totalElements;
-    this.applyFilters();
-    setTimeout(() => this.adjustCardHeights(), 0);
-  });
-}
-  
-    nextPage() {
+
+  // ✅ Load page with pagination
+  loadPage() {
+    this.http
+      .get<PaginatedResponse<SharedFile>>(
+        'http://localhost:8080/api/shared-files/by-me',
+        {
+          params: {
+            pageNumber: this.currentPage.toString(),
+            pageSize: this.pageSize.toString()
+          }
+        }
+      )
+      .subscribe((res: PaginatedResponse<SharedFile>) => {
+        this.allFiles = res.fetchFiles;
+        this.totalPages = res.totalPages;
+        this.totalElements = res.totalElements;
+        this.applyFilters();
+        this.saveToCookies();
+        setTimeout(() => this.adjustCardHeights(), 0);
+      });
+  }
+
+  // ✅ Pagination Controls
+  nextPage() {
     if (this.currentPage + 1 < this.totalPages) {
       this.currentPage++;
       this.searchQuery.trim()
@@ -365,7 +411,7 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
         : this.loadPage();
     }
   }
-  
+
   prevPage() {
     if (this.currentPage > 0) {
       this.currentPage--;
@@ -374,41 +420,60 @@ export class SharedFilesComponent implements OnInit, AfterViewInit {
         : this.loadPage();
     }
   }
-   goToPage(page: number) {
+
+  goToPage(page: number) {
     if (page >= 0 && page < this.totalPages) {
       this.currentPage = page;
-  
-      if (this.searchQuery.trim()) {
-        this.searchFilesWithPagination();
-      } else {
-        this.loadPage();
-      }
+      this.searchQuery.trim()
+        ? this.searchFilesWithPagination()
+        : this.loadPage();
     }
   }
-  
-  
-    //✅ Search with Pagination
-    searchFilesWithPagination() {
-  if (!this.searchQuery.trim()) {
-    this.currentPage = 0;
-    this.loadPage();
-    return;
+
+  // ✅ Search with Pagination
+  searchFilesWithPagination() {
+    if (!this.searchQuery.trim()) {
+      this.currentPage = 0;
+      this.loadPage();
+      return;
+    }
+
+    this.http
+      .get<PaginatedResponse<SharedFile>>(
+        `http://localhost:8080/api/shared-files/by-me`,
+        {
+          params: {
+            keyword: this.searchQuery,
+            pageNumber: this.currentPage.toString(),
+            pageSize: this.pageSize.toString()
+          }
+        }
+      )
+      .subscribe({
+        next: (res) => {
+          this.allFiles = res.fetchFiles;
+          this.totalPages = res.totalPages;
+          this.applyFilters();
+          this.saveToCookies();
+        },
+        error: (err) => console.error('Search failed', err)
+      });
   }
 
-  this.http.get<PaginatedResponse<SharedFile>>(`http://localhost:8080/api/shared-files/by-me`, {
-    params: { 
-      keyword: this.searchQuery,
-      pageNumber: this.currentPage.toString(),
-      pageSize: this.pageSize.toString()
-    }
-  }).subscribe({
-    next: (res) => {
-      this.allFiles = res.fetchFiles;
-      this.totalPages = res.totalPages;
-      this.applyFilters(); 
-    },
-    error: (err) => console.error('Search failed', err)
-  });
-}
+  // ✅ Cookie Handling
+  private saveToCookies() {
+    this.cookieService.set('sharedfiles_page', this.currentPage.toString());
+    this.cookieService.set('sharedfiles_filter', this.filterType);
+    this.cookieService.set('sharedfiles_query', this.searchQuery);
+  }
 
+  private restoreFromCookies() {
+    const page = this.cookieService.get('sharedfiles_page');
+    const filter = this.cookieService.get('sharedfiles_filter');
+    const query = this.cookieService.get('sharedfiles_query');
+
+    if (page) this.currentPage = +page;
+    if (filter) this.filterType = filter as any;
+    if (query) this.searchQuery = query;
+  }
 }

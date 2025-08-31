@@ -325,11 +325,12 @@ export class SettingsComponent implements OnInit {
       this.logoutOk = true;
 
       // Clear session/local storage to remove user data
-      localStorage.removeItem('token');
+      localStorage.removeItem('SecureShareJwtCookie');
       localStorage.removeItem('username');
 
       // Redirect to login page
-      this.router.navigateByUrl('/');
+      this.router.navigate(['/']);
+
 
     },
     error: () => {

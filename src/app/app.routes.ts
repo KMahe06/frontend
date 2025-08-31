@@ -28,7 +28,8 @@ export const routes: Routes = [
   { path: 'upload', component: UploadComponent },
    { path: 'forgot-password', component: ForgotPasswordComponent },
   {path:'settings',component:SettingsComponent},
-   {path:'sensitivity',component:SensitivityComponent},
+   { path:'sensitivity/:id', component:SensitivityComponent },
+
    {path:'mywallet',component:MyWalletComponent},
    {path:'history',component:HistoryComponent},
    {path:'forgot-username',component:ForgotUsernameComponent},
