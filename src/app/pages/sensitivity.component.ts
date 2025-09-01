@@ -1,264 +1,558 @@
-import { Component, HostListener, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { FormsModule } from '@angular/forms';
+// src/app/pages/sensitivity.component.ts
+import { Component, HostListener, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule, NgForm } from '@angular/forms';
+import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CookieService } from 'ngx-cookie-service';
 import { SidebarComponent } from './sidebar.component';
-
+import { ShareService } from '../core/share.service';
 @Component({
   selector: 'app-sensitivity',
   standalone: true,
   imports: [CommonModule, FormsModule, HttpClientModule, SidebarComponent],
   template: `
-  <div class="layout" [class.sidebar-closed]="isSidebarClosed">
-    <!-- Sidebar -->
-    <app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+    <div class="layout" [class.sidebar-closed]="isSidebarClosed">
+      <!-- Hamburger (shows only when sidebar collapsed) -->
+      <button
+        class="hamburger"
+        *ngIf="isSidebarClosed"
+        (click)="toggleSidebar()"
+        aria-label="Open sidebar"
+      >
+        <span></span><span></span><span></span>
+      </button>
 
-    <!-- Content -->
-    <div class="content">
-      <h1 class="page-title">Share File</h1>
-      <p class="quote">Securely share your file with others</p>
+      <!-- Sidebar -->
+      <app-sidebar #sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
-      <div class="card">
-        <!-- File Info -->
-        <p *ngIf="fileId" class="file-info">
-          Sharing file with ID: <strong>{{ fileId }}</strong>
-        </p>
+      <!-- Content -->
+      <div class="content">
+        <h1 class="page-title">Share File</h1>
+        <p class="quote">“Choose sensitivity & recipient. We’ll handle the rest securely.”</p>
 
-        <!-- Username -->
-        <div class="field">
-          <label class="label">Enter Username</label>
-          <input
-            type="text"
-            [(ngModel)]="username"
-            placeholder="Enter username to share with" />
+        <!-- File info -->
+        <div class="file-info" *ngIf="fileId">
+          You are about to share <strong>File ID: {{ fileId }}</strong>
         </div>
 
-        <!-- Sensitivity Options -->
-        <div class="field">
-          <label class="label">Select Data Sensitivity</label>
-          <div class="radio-group">
-            <label>
-              <input type="radio" [(ngModel)]="sensitivity" [value]="true" />
-              Sensitive Data
-            </label>
-            <label>
-              <input type="radio" [(ngModel)]="sensitivity" [value]="false" />
-              Insensitive Data
-            </label>
+        <!-- Card -->
+        <form
+          #shareForm="ngForm"
+          (ngSubmit)="onShare(shareForm)"
+          novalidate
+          class="card"
+          [class.loading]="loading"
+        >
+          <div class="field">
+            <label class="label" for="recipient">Recipient Username</label>
+            <input
+              id="recipient"
+              type="text"
+              name="recipientUsername"
+              [(ngModel)]="recipientUsername"
+              required
+              autocomplete="username"
+              placeholder="e.g., KAVIYA"
+              [disabled]="loading"
+            />
+            <div class="hint" *ngIf="shareForm.submitted && !recipientUsername">
+              Recipient username is required
+            </div>
           </div>
+
+          <div class="field">
+            <span class="label">Sensitivity</span>
+            <div class="radio-group">
+              <label class="radio-pill" [class.active]="isSensitive === true">
+                <input
+                  type="radio"
+                  name="sensitivity"
+                  [value]="true"
+                  [(ngModel)]="isSensitive"
+                  [disabled]="loading"
+                />
+                <div class="pill-icon">🛡️</div>
+                <div class="pill-text">
+                  <div class="pill-title">Sensitive data</div>
+                  <div class="pill-sub">Stricter controls & tracking</div>
+                </div>
+              </label>
+
+              <label class="radio-pill" [class.active]="isSensitive === false">
+                <input
+                  type="radio"
+                  name="sensitivity"
+                  [value]="false"
+                  [(ngModel)]="isSensitive"
+                  [disabled]="loading"
+                />
+                <div class="pill-icon">📄</div>
+                <div class="pill-text">
+                  <div class="pill-title">Insensitive data</div>
+                  <div class="pill-sub">Standard sharing</div>
+                </div>
+              </label>
+            </div>
+            <div class="hint" *ngIf="shareForm.submitted && isSensitive === null">
+              Choose sensitivity
+            </div>
+          </div>
+
+          <!-- JWT Cookie status -->
+          <div class="cookie-status" [class.ok]="hasJwt" [class.bad]="!hasJwt">
+            <span class="dot"></span>
+            JWT cookie: <strong>{{ hasJwt ? 'found' : 'missing' }}</strong>
+          </div>
+
+          <button class="btn" type="submit" [disabled]="loading || !canSubmit()">
+            <span *ngIf="!loading">Share</span>
+            <span *ngIf="loading" class="spinner"></span>
+          </button>
+
+          <div class="success" *ngIf="successMessage">{{ successMessage }}</div>
+          <div class="error" *ngIf="errorMessage">{{ errorMessage }}</div>
+        </form>
+
+        <div class="actions-row">
+          <button class="btn-secondary" (click)="goBack()" [disabled]="loading">
+            Back to Wallet
+          </button>
+          <button class="btn-link" (click)="viewShared()" [disabled]="loading">
+            View Shared Files →
+          </button>
         </div>
-
-        <!-- Submit -->
-        <button class="btn" (click)="shareFile()">Share File</button>
-
-        <!-- Messages -->
-        <p *ngIf="successMessage" class="success">{{ successMessage }}</p>
-        <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
       </div>
     </div>
-  </div>
   `,
-  styles: [`
-    .layout {
-      display: flex;
-      min-height: 100vh;
-      background: #f9fafb;
-      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      transition: all 0.3s ease;
-    }
-    app-sidebar {
-      flex: 0 0 240px;
-      transition: flex-basis 0.3s ease, width 0.3s ease;
-    }
-    .layout.sidebar-closed app-sidebar {
-      flex: 0 0 0;
-      width: 0;
-      overflow: visible;
-    }
-    .content {
-      flex: 1;
-      padding: 40px;
-      background: #f9fafb;
-      min-width: 0;
-      transition: padding 0.3s ease;
-    }
-    .page-title {
-      font-size: 32px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 8px;
-      color: #111827;
-    }
-    .quote {
-      font-size: 14px;
-      color: #6b7280;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .card {
-      background: #fff;
-      padding: 24px;
-      border-radius: 16px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-      width: 100%;
-      max-width: 600px;
-      margin: 0 auto;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 28px rgba(0,0,0,0.12);
-    }
-    .field { margin-bottom: 16px; }
-    .label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: #374151;
-      margin-bottom: 6px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #d1d5db;
-      font-size: 14px;
-      background-color: #fff;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    input[type="text"]:focus {
-      border-color: #2563eb;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
-    }
-    .radio-group {
-      display: flex;
-      gap: 20px;
-      margin-top: 6px;
-    }
-    .radio-group label {
-      font-size: 14px;
-      color: #374151;
-      cursor: pointer;
-    }
-    .btn {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      background: #1e3a8a;
-      color: #fff;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.25s ease, transform 0.25s ease;
-    }
-    .btn:hover {
-      background: #1d4ed8;
-      transform: translateY(-1px);
-    }
-    .success {
-      color: #16a34a;
-      font-weight: 600;
-      text-align: center;
-      margin-top: 12px;
-    }
-    .error {
-      color: #dc2626;
-      font-weight: 600;
-      text-align: center;
-      margin-top: 12px;
-    }
-    .file-info {
-      font-size: 14px;
-      color: #374151;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    @media (max-width: 992px) {
-      .content { padding: 24px; }
-      .page-title { font-size: 28px; }
-    }
-    @media (max-width: 768px) {
-      .content { padding: 16px; }
-      .page-title { font-size: 24px; }
-      .card { padding: 18px; }
-    }
-    @media (max-width: 480px) {
-      .page-title { font-size: 20px; }
-    }
-  `]
+  styles: [
+    `
+      /* ---- Layout & Sidebar ---- */
+      .layout {
+        display: flex;
+        min-height: 100vh;
+        background: #f9fafb;
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        transition: all 0.3s ease;
+      }
+      app-sidebar {
+        flex: 0 0 240px;
+        transition: flex-basis 0.3s ease, width 0.3s ease;
+      }
+      .layout.sidebar-closed app-sidebar {
+        flex: 0 0 0;
+        width: 0;
+        overflow: visible;
+      }
+      .content {
+        flex: 1;
+        padding: 40px;
+        background: #f9fafb;
+        min-width: 0;
+        transition: padding 0.3s ease;
+      }
+      .page-title {
+        font-size: 32px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 8px;
+        color: #111827;
+      }
+      .quote {
+        font-size: 14px;
+        color: #6b7280;
+        text-align: center;
+        margin-bottom: 24px;
+      }
+
+      /* ---- Card ---- */
+      .card {
+        background: #fff;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.2s ease;
+        position: relative;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      }
+      .card.loading {
+        opacity: 0.8;
+      }
+
+      .field {
+        margin-bottom: 16px;
+      }
+      .label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+      }
+      input[type='text'] {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        font-size: 14px;
+        background-color: #fff;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      input[type='text']:focus {
+        border-color: #2563eb;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+      .hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #b91c1c;
+      }
+
+      /* ---- Radio group ---- */
+      .radio-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 8px;
+      }
+      .radio-pill {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 14px;
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+        user-select: none;
+      }
+      .radio-pill:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      }
+      .radio-pill.active {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+      }
+      .radio-pill input {
+        display: none;
+      }
+      .pill-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        background: #f3f4f6;
+        font-size: 20px;
+      }
+      .pill-text {
+        display: flex;
+        flex-direction: column;
+      }
+      .pill-title {
+        font-weight: 700;
+        color: #111827;
+        font-size: 14px;
+      }
+      .pill-sub {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* ---- Cookie status ---- */
+      .cookie-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        margin: 4px 0 12px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #f3f4f6;
+        color: #374151;
+      }
+      .cookie-status.ok {
+        background: #ecfdf5;
+        color: #065f46;
+      }
+      .cookie-status.bad {
+        background: #fef2f2;
+        color: #991b1b;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        display: inline-block;
+      }
+
+      /* ---- Buttons ---- */
+      .btn {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: none;
+        background: #1e3a8a;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.2s ease;
+      }
+      .btn:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(29, 78, 216, 0.25);
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .btn-secondary {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #111827;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .btn-secondary:hover {
+        background: #f9fafb;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+      }
+
+      .btn-link {
+        padding: 10px 2px;
+        border: none;
+        background: transparent;
+        color: #2563eb;
+        font-weight: 700;
+        cursor: pointer;
+        transition: color 0.2s ease, transform 0.2s ease;
+      }
+      .btn-link:hover {
+        color: #1d4ed8;
+        transform: translateY(-1px);
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: inline-block;
+        border: 2.5px solid #fff;
+        border-right-color: transparent;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .success {
+        color: #16a34a;
+        font-weight: 600;
+        text-align: center;
+        margin-top: 12px;
+      }
+      .error {
+        color: #dc2626;
+        font-weight: 600;
+        text-align: center;
+        margin-top: 12px;
+      }
+      .file-info {
+        font-size: 14px;
+        color: #374151;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+
+      .actions-row {
+        max-width: 600px;
+        margin: 16px auto 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      /* ---- Hamburger ---- */
+      .hamburger {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 26px;
+        height: 20px;
+        border: none;
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        cursor: pointer;
+        z-index: 1100;
+      }
+      .hamburger span {
+        display: block;
+        width: 100%;
+        height: 3px;
+        background: #000;
+        border-radius: 2px;
+      }
+
+      /* ---- Responsive ---- */
+      @media (max-width: 992px) {
+        .content {
+          padding: 24px;
+        }
+        .page-title {
+          font-size: 28px;
+        }
+      }
+      @media (max-width: 768px) {
+        .content {
+          padding: 16px;
+        }
+        .page-title {
+          font-size: 24px;
+        }
+        .card {
+          padding: 18px;
+        }
+        .radio-group {
+          grid-template-columns: 1fr;
+        }
+        .actions-row {
+          flex-direction: column;
+        }
+        .btn-secondary,
+        .btn-link {
+          width: 100%;
+          text-align: center;
+        }
+      }
+      @media (max-width: 480px) {
+        .page-title {
+          font-size: 20px;
+        }
+      }
+    `,
+  ],
 })
 export class SensitivityComponent implements OnInit {
   isSidebarClosed = false;
   fileId: string | null = null;
-  username = '';
-  sensitivity: boolean? 'true':'false' ;
+  private apiUrl = 'http://localhost:8080/api/auth/shared-files/share'; // Adjust as needed
+  recipientUsername = '';
+  isSensitive: boolean | null = null;
+
   successMessage = '';
   errorMessage = '';
+  loading = false;
+
+  hasJwt = false;
+  jwtToken: string | null = null;
+
+  @ViewChild('sidebar') sidebar!: SidebarComponent;
 
   constructor(
     private http: HttpClient,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private router: Router,
+    private cookieService: CookieService
   ) {}
 
   ngOnInit() {
     this.applyAutoClose();
     this.fileId = this.route.snapshot.paramMap.get('id');
+    this.checkJwt();
+  }
+
+  /** ✅ Check for JWT token in cookies */
+  private checkJwt() {
+    this.jwtToken = this.cookieService.get('jwt'); // adjust cookie name if needed
+    this.hasJwt = !!this.jwtToken;
   }
 
   @HostListener('window:resize')
-  onResize() { this.applyAutoClose(); }
+  onResize() {
+    this.applyAutoClose();
+  }
 
   applyAutoClose() {
-    const shouldClose = window.innerWidth <= 992;
-    if (this.isSidebarClosed !== shouldClose) this.isSidebarClosed = shouldClose;
+    this.isSidebarClosed = window.innerWidth <= 992;
   }
 
   onSidebarToggle(isClosed: boolean) {
     this.isSidebarClosed = isClosed;
   }
 
-  shareFile() {
+  toggleSidebar() {
+    if (this.sidebar) this.sidebar.toggleSidebar();
+  }
+
+  canSubmit() {
+    return this.fileId && this.recipientUsername.trim() && this.isSensitive !== null;
+  }
+
+  /** ✅ Share file */
+  onShare(form: NgForm) {
     this.successMessage = '';
     this.errorMessage = '';
 
-    if (!this.fileId) {
-      this.errorMessage = 'File ID is missing!';
-      return;
-    }
-    if (!this.username.trim()) {
-      this.errorMessage = 'Please enter a username';
-      return;
-    }
-    if (this.sensitivity === null) {
-      this.errorMessage = 'Please select sensitivity';
+    if (!this.canSubmit()) {
+      form.control.markAllAsTouched();
       return;
     }
 
-    const payload = {
-      fileId: Number(this.fileId),
-      recipientUsername: this.username.trim(),
-      isSensitive: this.sensitivity
+    this.loading = true;
+
+    const body = {
+      recipientUsername: this.recipientUsername.trim(),
+      fileId: this.fileId,
+      isSensitive: this.isSensitive,
     };
 
-    this.http.post<{ success?: boolean; message?: string }>(
-      'http://localhost:8080/api/shared-files/share',
-      payload
-    ).subscribe({
+    this.http.post<{ message?: string }>(this.apiUrl, body, { withCredentials: true }).subscribe({
       next: (res) => {
-        if (res?.success) {
-          this.successMessage = res.message || 'File shared successfully ✅';
-          this.username = '';
-          this.sensitivity = null;
-        } else {
-          this.errorMessage = res?.message || 'Failed to share file';
-        }
+        this.successMessage = res?.message || 'File shared successfully ✅';
+        this.errorMessage = '';
+        this.recipientUsername = '';
+        this.isSensitive = null;
+        form.resetForm();
       },
       error: (err) => {
-        this.errorMessage = err?.error?.message || 'Error while sharing file. Please try again.';
-      }
+        this.errorMessage = err?.error?.message || 'Failed to share file ❌';
+        console.error('Share error:', err);
+      },
+      complete: () => {
+        this.loading = false;
+      },
     });
+  }
+
+  goBack() {
+    this.router.navigate(['/mywallet']);
+  }
+
+  viewShared() {
+    this.router.navigate(['/shared-files']);
   }
 }

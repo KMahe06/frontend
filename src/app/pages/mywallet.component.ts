@@ -1,4 +1,13 @@
-import { Component, OnInit, HostListener, ViewChild, ViewChildren, QueryList, ElementRef, AfterViewInit } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  HostListener,
+  ViewChild,
+  ViewChildren,
+  QueryList,
+  ElementRef,
+  AfterViewInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -24,7 +33,6 @@ interface FilesResponse {
   lastPage: boolean;
 }
 
-
 @Component({
   selector: 'app-mywallet',
   standalone: true,
@@ -46,7 +54,12 @@ interface FilesResponse {
 
         <!-- Search -->
         <div class="search-bar">
-          <input type="text" [(ngModel)]="searchQuery" (input)="searchFilesWithPagination()" placeholder="Search by filename, category or description..." />
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            (input)="searchFilesWithPagination()"
+            placeholder="Search by filename, category or description..."
+          />
         </div>
 
         <!-- Card Grid -->
@@ -58,15 +71,15 @@ interface FilesResponse {
             [class.active]="selectedCard?.id === file.id"
             (click)="selectCard(file)"
           >
-            <h3>ID: {{ file.id }}</h3>
+            <!-- <h3>ID: {{ file.id }}</h3> -->
             <p><strong>Name:</strong> {{ file.filename }}</p>
             <p><strong>Description:</strong> {{ file.description }}</p>
-            <p class="category">
-              <strong>Category:</strong> {{ file.category }}
-            </p>
+            <p class="category"><strong>Category:</strong> {{ file.category }}</p>
 
             <div class="card-actions-inline">
-              <button class="btn btn-download" (click)="downloadFile(file, $event)">Download</button>
+              <button class="btn btn-download" (click)="downloadFile(file, $event)">
+                Download
+              </button>
               <button class="btn btn-share" (click)="shareFile(file, $event)">Share</button>
             </div>
             <div class="card-actions-delete">
@@ -83,222 +96,232 @@ interface FilesResponse {
       </div>
     </div>
   `,
-  styles: [`
-    .layout {
-      display: flex;
-      min-height: 100vh;
-      width: 100%;
-      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      transition: all 0.3s ease;
-      background: #f9fafb;
-    }
-    app-sidebar {
-      width: 240px;
-      flex-shrink: 0;
-      transition: all 0.3s ease;
-    }
-    .layout.sidebar-closed app-sidebar {
-      display: none;
-    }
-    .content {
-      flex: 1;
-      padding: 30px;
-      transition: all 0.3s ease;
-    }
-    .page-title {
-      text-align: center;
-      font-size: 30px;
-      font-weight: 700;
-      margin-bottom: 5px;
-    }
-    .quote {
-      text-align: center;
-      color: #6b7280;
-      margin-bottom: 20px;
-    }
+  styles: [
+    `
+      .layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        transition: all 0.3s ease;
+        background: #ffffffff;
+      }
+      app-sidebar {
+        width: 240px;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+      }
+      .layout.sidebar-closed app-sidebar {
+        display: none;
+      }
+      .content {
+        flex: 1;
+        padding: 30px;
+        transition: all 0.3s ease;
+      }
+      .page-title {
+        text-align: center;
+        font-size: 30px;
+        font-weight: 700;
+        margin-bottom: 5px;
+      }
+      .quote {
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 20px;
+      }
 
-    /* Search */
-    .search-bar {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 30px;
-    }
-    .search-bar input {
-      width: 100%;
-      max-width: 600px;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 15px;
-      transition: box-shadow 0.2s ease;
-    }
-    .search-bar input:focus {
-      outline: none;
-      border-color: #4f46e5;
-      box-shadow: 0 0 0 3px rgba(79,70,229,0.2);
-    }
+      /* Search */
+      .search-bar {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 30px;
+      }
+      .search-bar input {
+        width: 100%;
+        max-width: 600px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #ccc;
+        font-size: 15px;
+        transition: box-shadow 0.2s ease;
+      }
+      .search-bar input:focus {
+        outline: none;
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+      }
 
-    /* Grid */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-      align-items: stretch;
-    }
+      /* Grid */
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        align-items: stretch;
+      }
 
-    .file-card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 16px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      cursor: pointer;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .file-card:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.12);
-    }
-    .file-card h3 {
-      margin-bottom: 8px;
-      font-size: 18px;
-      font-weight: 600;
-      color: #111827;
-    }
-    .file-card p {
-      margin: 4px 0;
-      font-size: 14px;
-      color: #374151;
-    }
-    .file-card .category {
-      font-weight: 600;
-      color: #1e3a8a;
-    }
+      .file-card {
+        background: #fff;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        cursor: pointer;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .file-card:hover {
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+      }
+      .file-card h3 {
+        margin-bottom: 8px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+      }
+      .file-card p {
+        margin: 4px 0;
+        font-size: 14px;
+        color: #374151;
+      }
+      .file-card .category {
+        font-weight: 600;
+        color: #1e3a8a;
+      }
 
-    /* Inline actions */
-    .card-actions-inline {
-      display: flex;
-      gap: 10px;
-      margin-top: 12px;
-    }
-    .card-actions-inline .btn {
-      flex: 1;
-    }
+      /* Inline actions */
+      .card-actions-inline {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .card-actions-inline .btn {
+        flex: 1;
+      }
 
-    /* Delete full width */
-    .card-actions-delete {
-      margin-top: 10px;
-    }
-    .btn-delete {
-      width: 100%;
-      background: #dc2626;
-      color: white;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease;
-    }
-    .btn-delete:hover {
-      background: #991b1b;
-      transform: translateY(-2px) scale(1.02);
-    }
+      /* Delete full width */
+      .card-actions-delete {
+        margin-top: 10px;
+      }
+      .btn-delete {
+        width: 100%;
+        background: #6b7280;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s ease;
+      }
+      .btn-delete:hover {
+        background: #4b5563;
+        transform: translateY(-2px) scale(1.02);
+      }
 
-    .btn {
-      padding: 10px 14px;
-      border: none;
-      border-radius: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .btn:hover {
-      transform: translateY(-2px) scale(1.02);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
+      .btn {
+        padding: 10px 14px;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
 
-    .btn-download {
-      background: #2563eb;
-      color: white;
-    }
-    .btn-download:hover {
-      background: #1e40af;
-    }
-    .btn-share {
-      background: #16a34a;
-      color: white;
-    }
-    .btn-share:hover {
-      background: #15803d;
-    }
+      .btn-download {
+        background: #2d7bf0;
+        color: white;
+      }
+      .btn-download:hover {
+        background: #206ae0;
+      }
+      .btn-share {
+        background: #291969ff;
+        color: white;
+      }
+      .btn-share:hover {
+        background: #2f2664ff;
+      }
 
-    /* Active Card */
-    .file-card.active {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      width: 400px;
-      max-width: 95%;
-      transform: translate(-50%, -50%) scale(1.05);
-      z-index: 999;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.25);
-    }
+      /* Active Card */
+      .file-card.active {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 400px;
+        max-width: 95%;
+        transform: translate(-50%, -50%) scale(1.05);
+        z-index: 999;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+      }
 
-    /* Hamburger */
-    .hamburger {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      width: 25px;
-      height: 20px;
-      border: none;
-      background: transparent;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      cursor: pointer;
-      z-index: 1100;
-    }
-    .hamburger span {
-      display: block;
-      width: 100%;
-      height: 4px;
-      background: #000;
-      border-radius: 2px;
-    }
-    .pagination {
-      margin-top: 20px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 15px;
-    }
-    .pagination button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 8px;
-      background: #2563eb;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-    .pagination button[disabled] {
-      background: #9ca3af;
-      cursor: not-allowed;
-    }
+      /* Hamburger */
+      .hamburger {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 25px;
+        height: 20px;
+        border: none;
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        cursor: pointer;
+        z-index: 1100;
+      }
+      .hamburger span {
+        display: block;
+        width: 100%;
+        height: 4px;
+        background: #000;
+        border-radius: 2px;
+      }
+      .pagination {
+        margin-top: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+      }
+      .pagination button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        background: #2563eb;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .pagination button[disabled] {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
 
-    /* Responsiveness */
-    @media (max-width: 768px) {
-      .content { padding: 15px; }
-      .page-title { font-size: 24px; }
-      .card-grid { gap: 15px; }
-      .file-card { padding: 15px; }
-    }
-  `]
+      /* Responsiveness */
+      @media (max-width: 768px) {
+        .content {
+          padding: 15px;
+        }
+        .page-title {
+          font-size: 24px;
+        }
+        .card-grid {
+          gap: 15px;
+        }
+        .file-card {
+          padding: 15px;
+        }
+      }
+    `,
+  ],
 })
 export class MyWalletComponent implements OnInit, AfterViewInit {
   files: FileData[] = [];
@@ -352,7 +375,9 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   loadPage() {
     this.http
       .get<FilesResponse>(
-        `http://localhost:8080/api/files/fetch-all?pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
+        `http://localhost:8080/api/auth/files/fetch-all?pageNumber=${
+          this.currentPage + 1
+        }&pageSize=${this.pageSize}`,
         { withCredentials: true }
       )
       .subscribe({
@@ -362,7 +387,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
           this.totalElements = res.totalElements;
           setTimeout(() => this.adjustCardHeights(), 0);
         },
-        error: (err) => console.error('Failed to load files', err)
+        error: (err) => console.error('Failed to load files', err),
       });
   }
 
@@ -376,7 +401,9 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
 
     this.http
       .get<FilesResponse>(
-        `http://localhost:8080/api/files/fetch-all?keyword=${this.searchQuery}&pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
+        `http://localhost:8080/api/auth/files/fetch-all?keyword=${this.searchQuery}&pageNumber=${
+          this.currentPage + 1
+        }&pageSize=${this.pageSize}`,
         { withCredentials: true }
       )
       .subscribe({
@@ -386,7 +413,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
           this.totalElements = res.totalElements;
           setTimeout(() => this.adjustCardHeights(), 0);
         },
-        error: (err) => console.error('Search failed', err)
+        error: (err) => console.error('Search failed', err),
       });
   }
 
@@ -394,9 +421,9 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   downloadFile(file: FileData, event: MouseEvent) {
     event.stopPropagation();
     this.http
-      .get(`http://localhost:8080/api/files/download/${file.id}`, {
+      .get(`http://localhost:8080/api/auth/files/download/${file.id}`, {
         responseType: 'blob',
-        withCredentials: true
+        withCredentials: true,
       })
       .subscribe({
         next: (blob) => {
@@ -407,7 +434,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
           a.click();
           window.URL.revokeObjectURL(url);
         },
-        error: (err) => console.error('Download failed', err)
+        error: (err) => console.error('Download failed', err),
       });
   }
 
@@ -419,16 +446,12 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
   deleteFile(file: FileData, event: MouseEvent) {
     event.stopPropagation();
     this.http
-      .post(
-        `http://localhost:8080/api/files/delete/${file.id}`,
-        {},
-        { withCredentials: true }
-      )
+      .delete(`http://localhost:8080/api/auth/files/delete/${file.id}`, { withCredentials: true })
       .subscribe({
         next: () => {
           this.files = this.files.filter((f) => f.id !== file.id);
         },
-        error: (err) => console.error('Delete failed', err)
+        error: (err) => console.error('Delete failed', err),
       });
   }
 
@@ -438,44 +461,34 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
 
   private adjustCardHeights() {
     if (!this.cardElements || this.cardElements.length === 0) return;
-    this.cardElements.forEach(
-      (card) => (card.nativeElement.style.height = 'auto')
-    );
+    this.cardElements.forEach((card) => (card.nativeElement.style.height = 'auto'));
     let maxHeight = 0;
     this.cardElements.forEach((card) => {
       const height = card.nativeElement.offsetHeight;
       if (height > maxHeight) maxHeight = height;
     });
-    this.cardElements.forEach(
-      (card) => (card.nativeElement.style.height = maxHeight + 'px')
-    );
+    this.cardElements.forEach((card) => (card.nativeElement.style.height = maxHeight + 'px'));
   }
 
   /** ✅ Pagination controls */
   nextPage() {
     if (this.currentPage + 1 < this.totalPages) {
       this.currentPage++;
-      this.searchQuery.trim()
-        ? this.searchFilesWithPagination()
-        : this.loadPage();
+      this.searchQuery.trim() ? this.searchFilesWithPagination() : this.loadPage();
     }
   }
 
   prevPage() {
     if (this.currentPage > 0) {
       this.currentPage--;
-      this.searchQuery.trim()
-        ? this.searchFilesWithPagination()
-        : this.loadPage();
+      this.searchQuery.trim() ? this.searchFilesWithPagination() : this.loadPage();
     }
   }
 
   goToPage(page: number) {
     if (page >= 0 && page < this.totalPages) {
       this.currentPage = page;
-      this.searchQuery.trim()
-        ? this.searchFilesWithPagination()
-        : this.loadPage();
+      this.searchQuery.trim() ? this.searchFilesWithPagination() : this.loadPage();
     }
   }
 }

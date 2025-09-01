@@ -5,16 +5,15 @@ import { CookieService } from 'ngx-cookie-service';
 import { Observable } from 'rxjs';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
-
   private apiUrl = 'http://localhost:8080/api/auth'; // your backend endpoint
 
   constructor(private http: HttpClient, private cookieService: CookieService) {}
 
   // Login API → saves JWT in cookies
-  login(credentials: { username: string, password: string }): Observable<any> {
+  login(credentials: { username: string; password: string }): Observable<any> {
     return this.http.post(`${this.apiUrl}/login`, credentials, { withCredentials: true });
   }
 

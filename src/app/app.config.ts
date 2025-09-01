@@ -1,7 +1,9 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  provideBrowserGlobalErrorListeners,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { CookieService } from 'ngx-cookie-service';  // ✅ import CookieService
-
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -9,7 +11,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    
-    CookieService   // ✅ provide cookie service globally
-  ]
+    // Removed the redundant `CookieService` provider from here.
+    // It's already provided in your `main.ts` file, and Angular's DI will handle it globally.
+  ],
 };
