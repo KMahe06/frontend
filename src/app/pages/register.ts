@@ -144,7 +144,7 @@ export class RegisterComponent {
       next: () => {
         this.loading = false;
         this.message = 'Account created successfully!';
-        setTimeout(() => this.router.navigateByUrl('/dashboard'), 1500);
+        setTimeout(() => this.router.navigateByUrl('/'), 1500); 
       },
       error: err => {
         this.loading = false;

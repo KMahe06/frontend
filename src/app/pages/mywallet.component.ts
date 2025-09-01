@@ -11,7 +11,7 @@ interface FileData {
   filename: string;
   description: string;
   category: string;
-  customCategory?: string;
+  createdAt: Date;
 }
 
 // ✅ Re-added the requested FilesResponse interface
@@ -62,7 +62,7 @@ interface FilesResponse {
             <p><strong>Name:</strong> {{ file.filename }}</p>
             <p><strong>Description:</strong> {{ file.description }}</p>
             <p class="category">
-              <strong>Category:</strong> {{ file.category === 'other' ? file.customCategory : file.category }}
+              <strong>Category:</strong> {{ file.category }}
             </p>
 
             <div class="card-actions-inline">
@@ -350,7 +350,6 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
 
   /** ✅ Load files with pagination */
   loadPage() {
-    // This is now directly fetching data, similar to HistoryComponent
     this.http
       .get<FilesResponse>(
         `http://localhost:8080/api/files/fetch-all?pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
@@ -378,9 +377,7 @@ export class MyWalletComponent implements OnInit, AfterViewInit {
     this.http
       .get<FilesResponse>(
         `http://localhost:8080/api/files/fetch-all?keyword=${this.searchQuery}&pageNumber=${this.currentPage + 1}&pageSize=${this.pageSize}`,
-        {
-          withCredentials: true
-        }
+        { withCredentials: true }
       )
       .subscribe({
         next: (res) => {

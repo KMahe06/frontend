@@ -1,5 +1,5 @@
 import { Component, HostListener, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -39,11 +39,11 @@ import { SidebarComponent } from './sidebar.component';
           <label class="label">Select Data Sensitivity</label>
           <div class="radio-group">
             <label>
-              <input type="radio" [(ngModel)]="sensitivity" value="sensitive" />
+              <input type="radio" [(ngModel)]="sensitivity" [value]="true" />
               Sensitive Data
             </label>
             <label>
-              <input type="radio" [(ngModel)]="sensitivity" value="insensitive" />
+              <input type="radio" [(ngModel)]="sensitivity" [value]="false" />
               Insensitive Data
             </label>
           </div>
@@ -194,7 +194,7 @@ export class SensitivityComponent implements OnInit {
   isSidebarClosed = false;
   fileId: string | null = null;
   username = '';
-  sensitivity = '';
+  sensitivity: boolean? 'true':'false' ;
   successMessage = '';
   errorMessage = '';
 
@@ -205,7 +205,7 @@ export class SensitivityComponent implements OnInit {
 
   ngOnInit() {
     this.applyAutoClose();
-    this.fileId = this.route.snapshot.paramMap.get('id'); // <-- fetch fileId from route
+    this.fileId = this.route.snapshot.paramMap.get('id');
   }
 
   @HostListener('window:resize')
@@ -228,30 +228,36 @@ export class SensitivityComponent implements OnInit {
       this.errorMessage = 'File ID is missing!';
       return;
     }
-    if (!this.username) {
+    if (!this.username.trim()) {
       this.errorMessage = 'Please enter a username';
       return;
     }
-    if (!this.sensitivity) {
+    if (this.sensitivity === null) {
       this.errorMessage = 'Please select sensitivity';
       return;
     }
 
-    this.http.post<{ success: boolean; message?: string }>(
+    const payload = {
+      fileId: Number(this.fileId),
+      recipientUsername: this.username.trim(),
+      isSensitive: this.sensitivity
+    };
+
+    this.http.post<{ success?: boolean; message?: string }>(
       'http://localhost:8080/api/shared-files/share',
-      { fileId: this.fileId, recipientUsername: this.username, isSensitive: this.sensitivity }
+      payload
     ).subscribe({
       next: (res) => {
         if (res?.success) {
           this.successMessage = res.message || 'File shared successfully ✅';
           this.username = '';
-          this.sensitivity = '';
+          this.sensitivity = null;
         } else {
           this.errorMessage = res?.message || 'Failed to share file';
         }
       },
-      error: () => {
-        this.errorMessage = 'Error while sharing file. Please try again.';
+      error: (err) => {
+        this.errorMessage = err?.error?.message || 'Error while sharing file. Please try again.';
       }
     });
   }

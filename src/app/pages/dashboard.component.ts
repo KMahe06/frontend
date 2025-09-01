@@ -7,10 +7,11 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 
 interface FetchFileResponse {
   id: number;
-  fileName: string;
+  filename: string;
   description: string;
   category: string;
-  date: string;   // LocalDate comes as string
+  customCategory?: string;
+  createdAt: string;   // ✅ actual field from backend
 }
 
 interface FetchFilesResponse {
@@ -26,7 +27,7 @@ interface FetchFilesResponse {
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule, NgChartsModule, SidebarComponent, HttpClientModule],
-    template: `
+  template: `
     <div class="layout" [class.sidebar-closed]="isSidebarClosed">
       <!-- Hamburger (only if sidebar is closed) -->
       <button class="hamburger" *ngIf="isSidebarClosed" (click)="toggleSidebar()">
@@ -71,7 +72,7 @@ interface FetchFilesResponse {
                 </thead>
                 <tbody>
                   <tr *ngFor="let file of recentUploads">
-                    <td>{{file.name}}</td>
+                    <td>{{trimFilename(file.name)}}</td>
                     <td>{{file.category}}</td>
                     <td>{{file.date}}</td>
                   </tr>
@@ -163,7 +164,6 @@ interface FetchFilesResponse {
       .circle-card { flex: 1 1 100%; }
     }
   `]
-
 })
 export class DashboardComponent implements OnInit {
   isSidebarClosed = false;
@@ -210,20 +210,25 @@ export class DashboardComponent implements OnInit {
 
   // ✅ Fetch data from backend
   fetchDashboardData() {
-    this.http.get<FetchFilesResponse>('http://localhost:8080/api/files/fetch-all').subscribe({
+    this.http.get<FetchFilesResponse>('http://localhost:8080/api/files/fetch-all', { withCredentials: true }).subscribe({
       next: (res) => {
         const files = res.fetchFiles || [];
 
         // 📑 Recent Uploads (latest 5)
         this.recentUploads = [...files]
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
           .slice(0, 5)
-          .map(f => ({ name: f.fileName, category: f.category, date: f.date }));
+          .map(f => ({
+            name: f.filename,
+            category: f.category === 'other' ? f.customCategory || 'Other' : f.category,
+            date: new Date(f.createdAt).toLocaleDateString()
+          }));
 
         // 📂 Category Stats
         const categoryMap: Record<string, number> = {};
         files.forEach(f => {
-          categoryMap[f.category] = (categoryMap[f.category] || 0) + 1;
+          const cat = f.category === 'other' ? f.customCategory || 'Other' : f.category;
+          categoryMap[cat] = (categoryMap[cat] || 0) + 1;
         });
         this.categoryStats = Object.keys(categoryMap).map(k => ({ label: k, value: categoryMap[k] }));
 
@@ -236,7 +241,7 @@ export class DashboardComponent implements OnInit {
           last12Days.push(d.toISOString().split('T')[0]); // yyyy-MM-dd
         }
         const uploadsByDay: number[] = last12Days.map(day =>
-          files.filter(f => f.date === day).length
+          files.filter(f => f.createdAt.split('T')[0] === day).length
         );
         this.lineChartData = {
           labels: last12Days.map(d => d.slice(5)), // MM-dd
@@ -268,7 +273,10 @@ export class DashboardComponent implements OnInit {
         const topCategory = this.categoryStats.sort((a,b)=>b.value-a.value)[0]?.label;
         if (topCategory) {
           const trendData = last12Days.map(day =>
-            files.filter(f => f.category === topCategory && f.date === day).length
+            files.filter(f => {
+              const cat = f.category === 'other' ? f.customCategory || 'Other' : f.category;
+              return cat === topCategory && f.createdAt.split('T')[0] === day;
+            }).length
           );
           this.miniLineChartData = {
             labels: last12Days.map(d => d.slice(5)),
@@ -288,5 +296,11 @@ export class DashboardComponent implements OnInit {
 
   get chartColors(): string[] {
     return this.doughnutChartData.datasets[0].backgroundColor as string[];
+  }
+
+  // ✅ Utility to trim filename
+  trimFilename(name: string, maxLength: number = 20): string {
+    if (!name) return '';
+    return name.length > maxLength ? name.slice(0, maxLength) + '…' : name;
   }
 }
