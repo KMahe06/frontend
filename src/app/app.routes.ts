@@ -1,6 +1,6 @@
 import { RouterModule, Routes } from '@angular/router';
 import { OAuthCallbackComponent } from './pages/oauth';
-import { RegisterComponent } from './pages/register';
+
 import { LoginComponent } from './pages/login';
 import { VerifyOtpComponent } from './pages/verify-otp.component';
 import { DashboardComponent } from './pages/dashboard.component';
@@ -16,34 +16,32 @@ import { ConfirmPasswordComponent } from './pages/confirmpassword.component';
 import { otpforpasswordreset } from './pages/otpforpasswordreset.component';
 import { ReceivedFilesComponent } from './pages/receivedfiles.component';
 import { SharedFilesComponent } from './pages/sharedfiles.component';
-import { RegistrationVerifyOtpComponent } from './pages/registrationverify.component';
-
+import { RegisterComponent } from './pages/register';
 
 export const routes: Routes = [
   { path: '', component: LoginComponent },
-  { path: 'register', component: RegisterComponent },
+
   { path: 'oauth2/callback', component: OAuthCallbackComponent },
   { path: 'verify-otp', component: VerifyOtpComponent },
   { path: 'dashboard', component: DashboardComponent },
   { path: 'upload', component: UploadComponent },
-   { path: 'forgot-password', component: ForgotPasswordComponent },
-  {path:'settings',component:SettingsComponent},
-   { path:'sensitivity/:id', component:SensitivityComponent },
+  { path: 'forgot-password', component: ForgotPasswordComponent },
+  { path: 'settings', component: SettingsComponent },
+  { path: 'sensitivity/:id', component: SensitivityComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'mywallet', component: MyWalletComponent },
+  { path: 'history', component: HistoryComponent },
+  { path: 'forgot-username', component: ForgotUsernameComponent },
+  { path: 'confirmpassword', component: ConfirmPasswordComponent },
+  { path: 'otpforpasswordreset', component: otpforpasswordreset },
+  { path: 'receivedfiles', component: ReceivedFilesComponent },
+  { path: 'sharedfiles', component: SharedFilesComponent },
 
-   {path:'mywallet',component:MyWalletComponent},
-   {path:'history',component:HistoryComponent},
-   {path:'forgot-username',component:ForgotUsernameComponent},
-   {path:'confirmpassword',component:ConfirmPasswordComponent},
-   {path:'otpforpasswordreset',component:otpforpasswordreset},
-   {path:'receivedfiles',component:ReceivedFilesComponent},
-   {path:'sharedfiles',component:SharedFilesComponent},
-   {path:'registrationverify',component:RegistrationVerifyOtpComponent},
-  { path: '**', redirectTo: '' },
-   
+  // { path: '**', redirectTo: '' },
 ];
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
+  exports: [RouterModule],
 })
-export class AppRoutingModule { }
+export class AppRoutingModule {}

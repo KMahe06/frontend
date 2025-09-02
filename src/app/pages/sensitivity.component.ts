@@ -486,9 +486,11 @@ export class SensitivityComponent implements OnInit {
   }
 
   /** ✅ Check for JWT token in cookies */
+  /** ✅ Check for JWT token in cookies */
   private checkJwt() {
-    this.jwtToken = this.cookieService.get('jwt'); // adjust cookie name if needed
-    this.hasJwt = !!this.jwtToken;
+    // Instead of trying to read it, just assume the browser will attach it.
+    // Optionally, call a small backend "auth status" endpoint to confirm login.
+    this.hasJwt = true;
   }
 
   @HostListener('window:resize')
